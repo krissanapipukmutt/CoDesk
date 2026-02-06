@@ -1,0 +1,76 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=Space+Grotesk:wght@400;500;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  color-scheme: light;
+}
+
+body {
+  font-family: 'IBM Plex Sans Thai', 'Space Grotesk', sans-serif;
+  background: radial-gradient(1200px 800px at 10% -10%, #e6edff 0%, #f4f7fb 40%, #f8fafc 100%);
+  min-height: 100vh;
+}
+
+h1, h2, h3, .font-display {
+  font-family: 'Space Grotesk', 'IBM Plex Sans Thai', sans-serif;
+}
+
+.card {
+  @apply bg-white/90 backdrop-blur rounded-2xl shadow-soft border border-white/60;
+}
+
+.badge {
+  @apply inline-flex items-center rounded-full px-3 py-1 text-xs font-medium;
+}
+
+.input {
+  @apply w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo/30;
+}
+
+.select {
+  @apply w-full rounded-xl border border-slate-200 bg-white/80 px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo/30;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2 text-sm font-semibold transition;
+}
+
+.btn-primary {
+  @apply btn bg-indigo text-white shadow-glow hover:brightness-110;
+}
+
+.btn-secondary {
+  @apply btn bg-slate-100 text-slate-700 hover:bg-slate-200;
+}
+
+.btn-danger {
+  @apply btn bg-rose text-white hover:brightness-110;
+}
+
+.nav-link {
+  @apply rounded-xl px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-100;
+}
+
+.nav-link.active {
+  @apply bg-indigo/10 text-indigo;
+}
+
+.table {
+  @apply w-full text-left text-sm;
+}
+
+.table th {
+  @apply text-xs uppercase tracking-wide text-slate-400 font-semibold pb-2;
+}
+
+.table td {
+  @apply py-2 border-t border-slate-100;
+}
+
+.scrollbar {
+  scrollbar-color: #cbd5f5 transparent;
+  scrollbar-width: thin;
+}
