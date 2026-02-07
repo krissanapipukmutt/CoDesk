@@ -7,6 +7,7 @@ import DepartmentsPage from '../routes/departments';
 import EmployeesPage from '../routes/employees';
 import HolidaysPage from '../routes/holidays';
 import ReportsPage from '../routes/reports';
+import AdminUsersPage from '../routes/adminUsers';
 import UnauthorizedPage from '../routes/unauthorized';
 import HomeRedirect from '../routes/home';
 import { LoadingState } from '../components/State';
@@ -87,6 +88,16 @@ const App = () => {
           <RequireAuth roles={['employee', 'hr', 'admin']}>
             <Layout>
               <ReportsPage />
+            </Layout>
+          </RequireAuth>
+        }
+      />
+      <Route
+        path="/admin/users"
+        element={
+          <RequireAuth roles={['admin']}>
+            <Layout>
+              <AdminUsersPage />
             </Layout>
           </RequireAuth>
         }

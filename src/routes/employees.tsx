@@ -1,11 +1,12 @@
 ﻿import { useState } from 'react';
-import { useMutation, useQuery } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState, LoadingState } from '../components/State';
 import { useRepo } from '../data/repo';
 import { employeeSchema } from '../lib/validators';
 
 const EmployeesPage = () => {
   const { repo } = useRepo();
+  const queryClient = useQueryClient();
   const { data: employees = [], isLoading } = useQuery({
     queryKey: ['employees'],
     queryFn: () => repo.listEmployees()
@@ -26,15 +27,36 @@ const EmployeesPage = () => {
 
   const createMutation = useMutation({
     mutationFn: repo.createEmployee,
-    onSuccess: () => setMessage('บันทึกพนักงานแล้ว')
+    onSuccess: () => {
+      setMessage('บันทึกพนักงานแล้ว');
+      void queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+    onError: (err: any) => {
+      const message = err?.message ?? err?.details ?? 'บันทึกพนักงานไม่สำเร็จ';
+      setMessage(message);
+    }
   });
   const updateMutation = useMutation({
     mutationFn: ({ id, input }: { id: string; input: any }) => repo.updateEmployee(id, input),
-    onSuccess: () => setMessage('อัปเดตพนักงานแล้ว')
+    onSuccess: () => {
+      setMessage('อัปเดตพนักงานแล้ว');
+      void queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+    onError: (err: any) => {
+      const message = err?.message ?? err?.details ?? 'อัปเดตพนักงานไม่สำเร็จ';
+      setMessage(message);
+    }
   });
   const deleteMutation = useMutation({
     mutationFn: (id: string) => repo.deleteEmployee(id),
-    onSuccess: () => setMessage('ลบพนักงานแล้ว')
+    onSuccess: () => {
+      setMessage('ลบพนักงานแล้ว');
+      void queryClient.invalidateQueries({ queryKey: ['employees'] });
+    },
+    onError: (err: any) => {
+      const message = err?.message ?? err?.details ?? 'ลบพนักงานไม่สำเร็จ';
+      setMessage(message);
+    }
   });
 
   const handleSubmit = async (evt: React.FormEvent) => {

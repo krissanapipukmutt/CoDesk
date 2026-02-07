@@ -19,7 +19,6 @@ const sb = () => {
   return client.schema('codesk');
 };
 
-
 export class SupabaseRepo {
   async init() {
     if (!hasSupabaseEnv || !client) return false;
@@ -411,33 +410,10 @@ export class SupabaseRepo {
     password: string;
     role: 'employee' | 'hr' | 'admin';
   }) {
+    console.log("role",input.role);
     if (!client) throw new Error('UNAUTHORIZED');
     const { data, error } = await client.functions.invoke('admin_create_user', {
-      body: { ...input, action: 'create' }
-    });
-    if (error) throw error;
-    if (data?.error?.code) {
-      throw new Error(data.error.code);
-    }
-    return data;
-  }
-
-  async adminUpdateUserRole(input: { target_user_id: string; role: 'employee' | 'hr' | 'admin' }) {
-    if (!client) throw new Error('UNAUTHORIZED');
-    const { data, error } = await client.functions.invoke('admin_create_user', {
-      body: { ...input, action: 'update_role' }
-    });
-    if (error) throw error;
-    if (data?.error?.code) {
-      throw new Error(data.error.code);
-    }
-    return data;
-  }
-
-  async adminDeleteUser(input: { target_user_id: string }) {
-    if (!client) throw new Error('UNAUTHORIZED');
-    const { data, error } = await client.functions.invoke('admin_create_user', {
-      body: { ...input, action: 'delete' }
+      body: input
     });
     if (error) throw error;
     if (data?.error?.code) {

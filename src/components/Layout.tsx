@@ -7,6 +7,7 @@ const navItems = [
   { to: '/holidays', label: 'วันหยุด', roles: ['hr', 'admin'] },
   { to: '/departments', label: 'ฝ่ายงาน', roles: ['hr', 'admin'] },
   { to: '/employees', label: 'พนักงาน', roles: ['hr', 'admin'] },
+  { to: '/admin/users', label: 'ผู้ใช้', roles: ['admin'] },
   { to: '/reports', label: 'รายงาน', roles: ['employee', 'hr', 'admin'] }
 ];
 
