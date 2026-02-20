@@ -40,8 +40,10 @@ const nowUtcIso = () => DateTime.now().toUTC().toISO()!;
 type Listener = () => void;
 type AuthListener = (session: SessionInfo | null) => void;
 const DEMO_STORAGE_KEY = 'codesk_demo_state_v1';
+const DEMO_SCHEMA_VERSION = 1;
 
 type DemoState = {
+  version: number;
   departments: Department[];
   employees: Employee[];
   holidays: Holiday[];
@@ -77,8 +79,9 @@ export class SampleRepo {
       const raw = window.localStorage.getItem(DEMO_STORAGE_KEY);
       if (!raw) return null;
       const parsed = JSON.parse(raw) as Partial<DemoState>;
-      if (!parsed) return null;
+      if (!parsed || parsed.version !== DEMO_SCHEMA_VERSION) return null;
       return {
+        version: parsed.version ?? 0,
         departments: Array.isArray(parsed.departments) ? parsed.departments : [],
         employees: Array.isArray(parsed.employees) ? parsed.employees : [],
         holidays: Array.isArray(parsed.holidays) ? parsed.holidays : [],
@@ -92,6 +95,7 @@ export class SampleRepo {
   private persistState() {
     if (typeof window === 'undefined' || !window.localStorage) return;
     const payload: DemoState = {
+      version: DEMO_SCHEMA_VERSION,
       departments: this.departments,
       employees: this.employees,
       holidays: this.holidays,
@@ -109,7 +113,14 @@ export class SampleRepo {
       ...dept,
       dailyCapacity:
         dept.strategy === 'ASSIGNED'
-          ? Math.max(1, Math.floor(dept.dailyCapacity ?? this.baseBookableCount(dept.id, dept.officeId)))
+          ? Math.max(
+              1,
+              Math.floor(
+                typeof dept.dailyCapacity === 'number'
+                  ? dept.dailyCapacity
+                  : this.baseBookableCount(dept.id, dept.officeId)
+              )
+            )
           : null
     }));
     this.employees = stored?.employees?.length ? stored.employees : [...sampleEmployees];
@@ -250,37 +261,25 @@ export class SampleRepo {
     const dept = this.departments.find((d) => d.id === input.departmentId && d.isActive);
     if (!dept || dept.officeId !== input.officeId) throw new Error('DEPARTMENT_MISMATCH');
 
-    if (dept.strategy === 'ASSIGNED') {
-      if (!input.seatId) throw new Error('SEAT_REQUIRED');
-      const seat = this.seats.find(
-        (s) => s.id === input.seatId && s.departmentId === input.departmentId && s.officeId === input.officeId && s.isActive && s.isBookable
-      );
-      if (!seat) throw new Error('SEAT_NOT_ALLOWED');
-      const conflict = this.bookings.find(
-        (b) => b.seatId === input.seatId && b.status === 'CONFIRMED' && overlaps(b.startAt, b.endAt, input.startAt, input.endAt)
-      );
-      if (conflict) throw new Error('CONFLICT');
-      if (typeof dept.dailyCapacity === 'number') {
-        const days = segmentByDay(input.startAt, input.endAt).map((seg) => seg.date);
-        const confirmed = this.bookings.filter(
-          (b) => b.departmentId === input.departmentId && b.officeId === input.officeId && b.status === 'CONFIRMED'
-        );
-        for (const day of days) {
-          const count = confirmed.filter((b) => segmentByDay(b.startAt, b.endAt).some((seg) => seg.date === day)).length;
-          if (count + 1 > dept.dailyCapacity) throw new Error('OVER_CAPACITY');
-        }
-      }
-    } else {
-      if (input.seatId) throw new Error('SEAT_NOT_ALLOWED');
-      const capacity = this.seats.filter(
-        (s) => s.departmentId === input.departmentId && s.officeId === input.officeId && s.isActive && s.isBookable
-      ).length;
-      const windows: BookingWindow[] = this.bookings
-        .filter((b) => b.departmentId === input.departmentId && b.officeId === input.officeId && b.status === 'CONFIRMED')
-        .map((b) => ({ startAt: b.startAt, endAt: b.endAt }));
-      const max = maxConcurrent(windows, input.startAt, input.endAt);
-      if (max + 1 > capacity) throw new Error('OVER_CAPACITY');
-    }
+    const capacity =
+      typeof dept.dailyCapacity === 'number'
+        ? Math.max(0, Math.floor(dept.dailyCapacity))
+        : this.seats.filter(
+            (s) => s.departmentId === input.departmentId && s.officeId === input.officeId && s.isActive && s.isBookable
+          ).length;
+    const windows: BookingWindow[] = this.bookings
+      .filter((b) => b.departmentId === input.departmentId && b.officeId === input.officeId && b.status === 'CONFIRMED')
+      .map((b) => ({ startAt: b.startAt, endAt: b.endAt }));
+    const max = maxConcurrent(windows, input.startAt, input.endAt);
+    if (max + 1 > capacity) throw new Error('OVER_CAPACITY');
+
+    const selfOverlap = this.bookings.some(
+      (b) =>
+        b.employeeId === input.employeeId &&
+        b.status === 'CONFIRMED' &&
+        overlaps(b.startAt, b.endAt, input.startAt, input.endAt)
+    );
+    if (selfOverlap) throw new Error('CONFLICT');
 
     this.ensureHolidayRule(input.startAt, input.endAt, input.officeId);
 
@@ -289,7 +288,7 @@ export class SampleRepo {
       officeId: input.officeId,
       departmentId: input.departmentId,
       employeeId: input.employeeId,
-      seatId: input.seatId ?? null,
+      seatId: null,
       bookingType: input.bookingType,
       status: 'CONFIRMED',
       startAt: input.startAt,

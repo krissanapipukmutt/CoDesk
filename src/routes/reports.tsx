@@ -36,6 +36,12 @@ const ReportsPage = () => {
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
+  const departmentMap = useMemo(() => {
+    const map = new Map<string, string>();
+    departments.forEach((d) => map.set(d.id, d.name));
+    return map;
+  }, [departments]);
+
   const filterRange = (date: string) => {
     if (startDate && date < startDate) return false;
     if (endDate && date > endDate) return false;
@@ -99,6 +105,9 @@ const ReportsPage = () => {
 
   if (l1 || l2 || l3 || l4 || l5) return <LoadingState />;
 
+  const dataCardClass = 'card p-6 flex flex-col h-[360px]';
+  const tableWrapClass = 'flex-1 overflow-y-auto scrollbar';
+
   return (
     <div className="space-y-6">
       <div className="card p-6">
@@ -137,152 +146,162 @@ const ReportsPage = () => {
         </div>
       </div>
 
-      <div className="card p-6">
+      <div className={dataCardClass}>
         <h3 className="text-lg font-display mb-4">V1: Bookings per Day</h3>
-        {filteredV1.length === 0 ? (
-          <EmptyState label="ไม่มีข้อมูล" />
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>วันที่</th>
-                <th>ฝ่ายงาน</th>
-                <th>ทั้งหมด</th>
-                <th>ยืนยัน</th>
-                <th>ยกเลิก</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredV1.map((r, idx) => (
-                <tr key={idx}>
-                  <td>{r.local_date}</td>
-                  <td>{departments.find((d) => d.id === r.department_id)?.name ?? '-'}</td>
-                  <td>{r.total_bookings}</td>
-                  <td>{r.confirmed_bookings}</td>
-                  <td>{r.cancelled_bookings}</td>
+        <div className={tableWrapClass}>
+          {filteredV1.length === 0 ? (
+            <EmptyState label="ไม่มีข้อมูล" />
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>ฝ่ายงาน</th>
+                  <th>ทั้งหมด</th>
+                  <th>ยืนยัน</th>
+                  <th>ยกเลิก</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {filteredV1.map((r, idx) => (
+                  <tr key={idx}>
+                    <td>{r.local_date}</td>
+                    <td>{departmentMap.get(r.department_id) ?? '-'}</td>
+                    <td>{r.total_bookings}</td>
+                    <td>{r.confirmed_bookings}</td>
+                    <td>{r.cancelled_bookings}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
-      <div className="card p-6">
+      <div className={dataCardClass}>
         <h3 className="text-lg font-display mb-4">V2: Utilization by Department</h3>
-        {filteredV2.length === 0 ? (
-          <EmptyState label="ไม่มีข้อมูล" />
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>วันที่</th>
-                <th>ฝ่ายงาน</th>
-                <th>Booked นาที</th>
-                <th>Capacity นาที</th>
-                <th>Utilization %</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredV2.map((r, idx) => (
-                <tr key={idx}>
-                  <td>{r.local_date}</td>
-                  <td>{departments.find((d) => d.id === r.department_id)?.name ?? '-'}</td>
-                  <td>{r.booked_minutes}</td>
-                  <td>{r.capacity_minutes}</td>
-                  <td>{r.utilization_pct}</td>
+        <div className={tableWrapClass}>
+          {filteredV2.length === 0 ? (
+            <EmptyState label="ไม่มีข้อมูล" />
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>ฝ่ายงาน</th>
+                  <th>Booked นาที</th>
+                  <th>Capacity นาที</th>
+                  <th>Utilization %</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {filteredV2.map((r, idx) => (
+                  <tr key={idx}>
+                    <td>{r.local_date}</td>
+                    <td>{departmentMap.get(r.department_id) ?? '-'}</td>
+                    <td>{r.booked_minutes}</td>
+                    <td>{r.capacity_minutes}</td>
+                    <td>{r.utilization_pct}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
-      <div className="card p-6">
+      <div className={dataCardClass}>
         <h3 className="text-lg font-display mb-4">V3: Popular Seats</h3>
-        {filteredV3.length === 0 ? (
-          <EmptyState label="ไม่มีข้อมูล" />
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>วันที่</th>
-                <th>ฝ่ายงาน</th>
-                <th>ที่นั่ง</th>
-                <th>จำนวนจอง</th>
-                <th>นาทีที่ใช้งาน</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredV3.map((r, idx) => (
-                <tr key={idx}>
-                  <td>{r.local_date}</td>
-                  <td>{departments.find((d) => d.id === r.department_id)?.name ?? '-'}</td>
-                  <td>{r.seat_code}</td>
-                  <td>{r.booking_count}</td>
-                  <td>{r.booked_minutes}</td>
+        <div className={tableWrapClass}>
+          {filteredV3.length === 0 ? (
+            <EmptyState label="ไม่มีข้อมูล" />
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>ฝ่ายงาน</th>
+                  <th>ที่นั่ง</th>
+                  <th>จำนวนจอง</th>
+                  <th>นาทีที่ใช้งาน</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {filteredV3.map((r, idx) => (
+                  <tr key={idx}>
+                    <td>{r.local_date}</td>
+                    <td>{departmentMap.get(r.department_id) ?? '-'}</td>
+                    <td>{r.seat_code}</td>
+                    <td>{r.booking_count}</td>
+                    <td>{r.booked_minutes}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
-      <div className="card p-6">
+      <div className={dataCardClass}>
         <h3 className="text-lg font-display mb-4">V4: Booking Status Summary</h3>
-        {filteredV4.length === 0 ? (
-          <EmptyState label="ไม่มีข้อมูล" />
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>วันที่</th>
-                <th>ฝ่ายงาน</th>
-                <th>สถานะ</th>
-                <th>จำนวน</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredV4.map((r, idx) => (
-                <tr key={idx}>
-                  <td>{r.local_date}</td>
-                  <td>{departments.find((d) => d.id === r.department_id)?.name ?? '-'}</td>
-                  <td>{r.status}</td>
-                  <td>{r.booking_count}</td>
+        <div className={tableWrapClass}>
+          {filteredV4.length === 0 ? (
+            <EmptyState label="ไม่มีข้อมูล" />
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>ฝ่ายงาน</th>
+                  <th>สถานะ</th>
+                  <th>จำนวน</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {filteredV4.map((r, idx) => (
+                  <tr key={idx}>
+                    <td>{r.local_date}</td>
+                    <td>{departmentMap.get(r.department_id) ?? '-'}</td>
+                    <td>{r.status}</td>
+                    <td>{r.booking_count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
 
-      <div className="card p-6">
+      <div className={dataCardClass}>
         <h3 className="text-lg font-display mb-4">V5: Peak Times</h3>
-        {filteredV5.length === 0 ? (
-          <EmptyState label="ไม่มีข้อมูล" />
-        ) : (
-          <table className="table">
-            <thead>
-              <tr>
-                <th>วันที่</th>
-                <th>ฝ่ายงาน</th>
-                <th>เริ่ม</th>
-                <th>สิ้นสุด</th>
-                <th>จำนวนคน</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredV5.slice(0, 200).map((r, idx) => (
-                <tr key={idx}>
-                  <td>{r.local_date}</td>
-                  <td>{departments.find((d) => d.id === r.department_id)?.name ?? '-'}</td>
-                  <td>{r.slot_start_local?.toString().slice(11, 16)}</td>
-                  <td>{r.slot_end_local?.toString().slice(11, 16)}</td>
-                  <td>{r.concurrent_bookings}</td>
+        <div className={tableWrapClass}>
+          {filteredV5.length === 0 ? (
+            <EmptyState label="ไม่มีข้อมูล" />
+          ) : (
+            <table className="table">
+              <thead>
+                <tr>
+                  <th>วันที่</th>
+                  <th>ฝ่ายงาน</th>
+                  <th>เริ่ม</th>
+                  <th>สิ้นสุด</th>
+                  <th>จำนวนคน</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        )}
+              </thead>
+              <tbody>
+                {filteredV5.map((r, idx) => (
+                  <tr key={idx}>
+                    <td>{r.local_date}</td>
+                    <td>{departmentMap.get(r.department_id) ?? '-'}</td>
+                    <td>{r.slot_start_local?.toString().slice(11, 16)}</td>
+                    <td>{r.slot_end_local?.toString().slice(11, 16)}</td>
+                    <td>{r.concurrent_bookings}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
       </div>
     </div>
   );

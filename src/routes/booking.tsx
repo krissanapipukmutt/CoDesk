@@ -4,7 +4,7 @@ import { DateTime } from 'luxon';
 import Calendar from '../components/Calendar';
 import { EmptyState, LoadingState } from '../components/State';
 import { useRepo } from '../data/repo';
-import { Booking, BookingType, DepartmentStrategy, Employee } from '../data/types';
+import { Booking, BookingType, DepartmentStrategy, Employee, CreateBookingInput } from '../data/types';
 import { bookingSchema } from '../lib/validators';
 import { parseLocalDateTimeToUtc } from '../lib/tz';
 import { mapErrorCodeToMessage, parseErrorCode } from '../lib/errors';
@@ -50,20 +50,19 @@ const BookingPage = () => {
   const defaultEndTime = '18:00';
   const [officeId, setOfficeId] = useState(profile?.officeId ?? '');
   const [departmentId, setDepartmentId] = useState(profile?.departmentId ?? '');
-  const [bookingType, setBookingType] = useState<BookingType>('SINGLE_DAY');
-  const [startDate, setStartDate] = useState(todayIso);
-  const [endDate, setEndDate] = useState(todayIso);
-  const [startTime, setStartTime] = useState(defaultStartTime);
-  const [endTime, setEndTime] = useState(defaultEndTime);
+  const bookingType: BookingType = 'SINGLE_DAY';
   const [startDateTimeLocal, setStartDateTimeLocal] = useState(
     toLocalDateTimeInput(todayIso, defaultStartTime)
   );
   const [endDateTimeLocal, setEndDateTimeLocal] = useState(
     toLocalDateTimeInput(todayIso, defaultEndTime)
   );
-  const [seatId, setSeatId] = useState<string | null>(null);
   const [employeeId, setEmployeeId] = useState(profile?.employeeId ?? '');
   const [selectedDate, setSelectedDate] = useState(todayIso);
+  const [calendarMonthIso, setCalendarMonthIso] = useState(
+    DateTime.fromISO(todayIso, { zone: 'Asia/Bangkok' }).startOf('month').toISODate()!
+  );
+  const calendarMonthLabel = DateTime.fromISO(calendarMonthIso, { zone: 'Asia/Bangkok' }).toFormat('LLLL yyyy');
   const [editing, setEditing] = useState<Booking | null>(null);
   const [message, setMessage] = useState('');
   const isEmployee = profile?.role === 'employee';
@@ -78,103 +77,118 @@ const BookingPage = () => {
     if (bookingType === 'SINGLE_DAY') {
       const startParts = splitLocalDateTime(startDateTimeLocal);
       if (startParts) {
-        setEndDate(startParts.date);
+        const endTime = splitLocalDateTime(endDateTimeLocal)?.time ?? defaultEndTime;
         setEndDateTimeLocal(toLocalDateTimeInput(startParts.date, endTime));
       }
     }
-  }, [bookingType, startDateTimeLocal, endTime]);
+  }, [startDateTimeLocal, endDateTimeLocal]);
 
   useEffect(() => {
-    if (strategy === 'UNASSIGNED') {
-      setSeatId(null);
+    const startParts = splitLocalDateTime(startDateTimeLocal);
+    const endParts = splitLocalDateTime(endDateTimeLocal);
+    if (!startParts || !endParts) return;
+    const startDateObj = DateTime.fromISO(startParts.date, { zone: 'Asia/Bangkok' });
+    const endDateObj = DateTime.fromISO(endParts.date, { zone: 'Asia/Bangkok' });
+    const needsAlign =
+      (bookingType === 'SINGLE_DAY' && startParts.date !== endParts.date) ||
+      endDateObj < startDateObj ||
+      endDateObj.year !== startDateObj.year;
+    if (needsAlign) {
+      const next = toLocalDateTimeInput(startParts.date, endParts.time);
+      if (next !== endDateTimeLocal) {
+        setEndDateTimeLocal(next);
+      }
     }
-  }, [strategy]);
+  }, [startDateTimeLocal, endDateTimeLocal]);
 
-  useEffect(() => {
-    if (!profile) return;
-    if (profile.role === 'employee' || profile.role === 'hr') {
-      setOfficeId(profile.officeId);
-      setDepartmentId(profile.departmentId);
-    }
-    if (profile.role === 'employee') {
-      setEmployeeId(profile.employeeId);
-    }
-  }, [profile]);
+useEffect(() => {
+}, [strategy]);
 
-  useEffect(() => {
-    const parts = splitLocalDateTime(startDateTimeLocal);
-    if (parts) {
-      setStartDate(parts.date);
-      setStartTime(parts.time);
-    }
-  }, [startDateTimeLocal]);
+useEffect(() => {
+  if (!profile) return;
+  if (profile.role === 'employee' || profile.role === 'hr') {
+    setOfficeId(profile.officeId);
+    setDepartmentId(profile.departmentId);
+  }
+  if (profile.employeeId) {
+    setEmployeeId(profile.employeeId);
+  }
+}, [profile]);
 
-  useEffect(() => {
-    const parts = splitLocalDateTime(endDateTimeLocal);
-    if (parts) {
-      setEndDate(parts.date);
-      setEndTime(parts.time);
-    }
-  }, [endDateTimeLocal]);
+useEffect(() => {
+  if (!isAdmin) return;
+  const emp = employees.find((e) => e.id === employeeId);
+  if (!emp) return;
+  const dept = departments.find((d) => d.id === emp.departmentId);
+  if (dept) {
+    setDepartmentId(dept.id);
+    setOfficeId(dept.officeId);
+  }
+}, [employeeId, isAdmin, employees, departments]);
 
   const visibleOffices = shouldScope ? offices.filter((o) => o.id === scopedOfficeId) : offices;
   const visibleDepartments = shouldScope ? departments.filter((d) => d.id === scopedDepartmentId) : departments;
   const filteredSeats = seats.filter((s) => s.departmentId === scopedDepartmentId && s.officeId === scopedOfficeId);
+  const seatId: null = null;
   const deptEmployees = employees.filter((e) => e.departmentId === scopedDepartmentId);
-  const filteredEmployees = isEmployee ? deptEmployees.filter((e) => e.id === profile?.employeeId) : deptEmployees;
-  const filteredBookings = bookings.filter(
-    (b) => b.departmentId === scopedDepartmentId && b.officeId === scopedOfficeId
-  );
+  const filteredEmployees = isAdmin ? employees : deptEmployees.filter((e) => e.id === profile?.employeeId);
+
+  const filteredBookings = useMemo(() => {
+    if (profile?.role === 'employee' || profile?.role === 'hr') {
+      return bookings.filter(
+        (b) => b.departmentId === profile.departmentId && b.officeId === profile.officeId
+      );
+    }
+    if (scopedDepartmentId) {
+      return bookings.filter((b) => b.departmentId === scopedDepartmentId && b.officeId === scopedOfficeId);
+    }
+    return bookings;
+  }, [bookings, profile, scopedDepartmentId, scopedOfficeId]);
 
   const employeeMap = useMemo(() => {
     const map = new Map<string, Employee>();
     employees.forEach((e) => map.set(e.id, e));
     return map;
   }, [employees]);
-  const showNamesInCalendar = profile?.role !== 'employee';
+  const showNamesInCalendar = true;
 
   const availabilityMap = useMemo(() => {
-    const map: Record<string, { bookings: number; remaining?: number; tooltip?: string }> = {};
+    const map: Record<string, { date: string; bookings: number; remaining?: number; tooltip?: string; isMine?: boolean }> =
+      {};
     const seatCount = filteredSeats.filter((s) => s.isActive && s.isBookable).length;
+    const departmentCapacity =
+      departments.find((d) => d.id === scopedDepartmentId)?.dailyCapacity ?? null;
+    const capacityBase = departmentCapacity && departmentCapacity > 0 ? departmentCapacity : seatCount;
     const confirmed = filteredBookings.filter((b) => b.status === 'CONFIRMED');
 
     confirmed.forEach((b) => {
       segmentByDay(b.startAt, b.endAt).forEach((seg) => {
         const key = seg.date;
-        map[key] = map[key] ?? { bookings: 0, tooltip: '' };
+        const isMine = profile?.employeeId === b.employeeId;
+        map[key] = map[key] ?? { date: key, bookings: 0, tooltip: '', isMine: false };
         map[key].bookings += 1;
         if (showNamesInCalendar) {
           const name = employeeMap.get(b.employeeId)?.name ?? '';
           map[key].tooltip = [map[key].tooltip, name].filter(Boolean).join(', ');
         }
+        if (isMine) map[key].isMine = true;
       });
     });
 
     Object.keys(map).forEach((date) => {
-      if (strategy === 'UNASSIGNED') {
-        const remaining = remainingCapacityForDay(
-          confirmed.map((b) => ({ startAt: b.startAt, endAt: b.endAt })),
-          seatCount,
-          date
-        );
-        map[date].remaining = remaining;
-      }
-      if (strategy === 'ASSIGNED') {
-        const usedSeats = new Set(
-          confirmed
-            .filter((b) => b.seatId)
-            .filter((b) => segmentByDay(b.startAt, b.endAt).some((seg) => seg.date === date))
-            .map((b) => b.seatId)
-        );
-        map[date].remaining = Math.max(seatCount - usedSeats.size, 0);
-      }
+      const remaining = remainingCapacityForDay(
+        confirmed.map((b) => ({ startAt: b.startAt, endAt: b.endAt })),
+        capacityBase,
+        date
+      );
+      map[date].remaining = remaining;
     });
 
     return map;
-  }, [filteredBookings, filteredSeats, strategy, employeeMap, showNamesInCalendar]);
+  }, [filteredBookings, filteredSeats, strategy, employeeMap, showNamesInCalendar, departments, scopedDepartmentId]);
 
-  const bookingMutation = useMutation({
-    mutationFn: (input: any) => repo.createBooking(input),
+  const bookingMutation = useMutation<unknown, Error, CreateBookingInput>({
+    mutationFn: (input) => repo.createBooking(input),
     onSuccess: () => {
       setMessage('บันทึกการจองเรียบร้อย');
       setEditing(null);
@@ -185,8 +199,8 @@ const BookingPage = () => {
     }
   });
 
-  const cancelMutation = useMutation({
-    mutationFn: ({ id, reason }: { id: string; reason?: string }) => repo.cancelBooking(id, reason),
+  const cancelMutation = useMutation<unknown, Error, { id: string; reason?: string | null }>({
+    mutationFn: ({ id, reason }) => repo.cancelBooking(id, reason),
     onSuccess: () => setMessage('ยกเลิกการจองเรียบร้อย'),
     onError: (err: any) => {
       const code = parseErrorCode(err?.message ?? err?.details ?? err?.error_description);
@@ -197,7 +211,6 @@ const BookingPage = () => {
   const handleSubmit = async (evt: React.FormEvent) => {
     evt.preventDefault();
     setMessage('');
-    const normalizedSeatId = seatId && seatId.length > 0 ? seatId : null;
     const effectiveOfficeId = isAdmin ? officeId : profile?.officeId ?? officeId;
     const effectiveDepartmentId = isAdmin ? departmentId : profile?.departmentId ?? departmentId;
     const effectiveEmployeeId = isEmployee ? profile?.employeeId ?? employeeId : employeeId;
@@ -207,11 +220,39 @@ const BookingPage = () => {
       setMessage('กรุณาระบุวันเวลาให้ครบถ้วน');
       return;
     }
+    const daySpan =
+      DateTime.fromISO(endParts.date, { zone: 'Asia/Bangkok' })
+        .diff(DateTime.fromISO(startParts.date, { zone: 'Asia/Bangkok' }), 'days')
+        .days + 1;
+    if (daySpan > 60) {
+      setMessage('ช่วงวันยาวเกิน 60 วัน กรุณาแบ่งการจองเป็นช่วงที่สั้นลง');
+      return;
+    }
+
+    // Pre-check capacity per day using daily_capacity (or seat count fallback)
+    const departmentCapacity =
+      departments.find((d) => d.id === effectiveDepartmentId)?.dailyCapacity ?? null;
+    const seatCount = filteredSeats.filter((s) => s.isActive && s.isBookable).length;
+    const capacityBase = departmentCapacity && departmentCapacity > 0 ? departmentCapacity : seatCount;
+    const confirmed = filteredBookings.filter((b) => b.status === 'CONFIRMED');
+    const days = segmentByDay(startParts.date + 'T00:00:00', endParts.date + 'T23:59:59').map((seg) => seg.date);
+    const overFull = days.some((d) => {
+      const rem = remainingCapacityForDay(
+        confirmed.map((b) => ({ startAt: b.startAt, endAt: b.endAt })),
+        capacityBase,
+        d
+      );
+      return rem <= 0;
+    });
+    if (overFull) {
+      setMessage('วันดังกล่าวเต็มตามความจุที่ตั้งไว้');
+      return;
+    }
     const parsed = bookingSchema.safeParse({
       employeeId: effectiveEmployeeId,
       departmentId: effectiveDepartmentId,
       officeId: effectiveOfficeId,
-      seatId: normalizedSeatId,
+      seatId: null,
       bookingType,
       startDate: startParts.date,
       startTime: startParts.time,
@@ -233,18 +274,23 @@ const BookingPage = () => {
       setMessage('วันเวลาไม่ถูกต้อง');
       return;
     }
-    if (editing) {
-      await cancelMutation.mutateAsync({ id: editing.id, reason: 'แก้ไขการจอง' });
+    try {
+      if (editing) {
+        await cancelMutation.mutateAsync({ id: editing.id, reason: 'แก้ไขการจอง' });
+      }
+      await bookingMutation.mutateAsync({
+        employeeId: effectiveEmployeeId,
+        departmentId: effectiveDepartmentId,
+        officeId: effectiveOfficeId,
+        seatId: null,
+        bookingType,
+        startAt,
+        endAt
+      });
+    } catch (err: any) {
+      const code = parseErrorCode(err?.message ?? err?.details ?? err?.error_description);
+      setMessage(mapErrorCodeToMessage(code));
     }
-    await bookingMutation.mutateAsync({
-      employeeId: effectiveEmployeeId,
-      departmentId: effectiveDepartmentId,
-      officeId: effectiveOfficeId,
-      seatId: normalizedSeatId,
-      bookingType,
-      startAt,
-      endAt
-    });
   };
 
   const bookingForSelectedDate = filteredBookings.filter((b) =>
@@ -291,16 +337,8 @@ const BookingPage = () => {
                 </select>
               </div>
               <div>
-                <label htmlFor="bookingType" className="text-sm text-slate-600">รูปแบบการจอง</label>
-                <select
-                  id="bookingType"
-                  className="select"
-                  value={bookingType}
-                  onChange={(e) => setBookingType(e.target.value as BookingType)}
-                >
-                  <option value="SINGLE_DAY">Single Day</option>
-                  <option value="DATE_RANGE">Date Range</option>
-                </select>
+                <label className="text-sm text-slate-600">รูปแบบการจอง</label>
+                <div className="select text-slate-500 bg-slate-50">Single Day</div>
               </div>
             </div>
 
@@ -319,20 +357,20 @@ const BookingPage = () => {
                 </div>
               </div>
               <div>
-                <label htmlFor="startTime" className="text-sm text-slate-600">เวลาเริ่มต้น</label>
-                <input
-                  id="startTime"
-                  className="input"
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="HH:mm"
-                  value={startTime}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setStartTime(value);
-                    setStartDateTimeLocal(toLocalDateTimeInput(startDate, value));
-                  }}
-                />
+                <label htmlFor="officeId" className="text-sm text-slate-600">ออฟฟิศ</label>
+                <select
+                  id="officeId"
+                  className="select"
+                  value={scopedOfficeId}
+                  onChange={(e) => setOfficeId(e.target.value)}
+                  disabled
+                >
+                  {visibleOffices.map((o) => (
+                    <option key={o.id} value={o.id}>
+                      {o.name}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
 
@@ -351,48 +389,13 @@ const BookingPage = () => {
                 </div>
               </div>
               <div>
-                <label htmlFor="endTime" className="text-sm text-slate-600">เวลาสิ้นสุด</label>
-                <input
-                  id="endTime"
-                  className="input"
-                  type="text"
-                  inputMode="numeric"
-                  placeholder="HH:mm"
-                  value={endTime}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    setEndTime(value);
-                    setEndDateTimeLocal(toLocalDateTimeInput(endDate, value));
-                  }}
-                />
-              </div>
-            </div>
-
-            <div className="grid gap-3 md:grid-cols-2">
-              <div>
-                <label htmlFor="officeId" className="text-sm text-slate-600">ออฟฟิศ</label>
-                <select
-                  id="officeId"
-                  className="select"
-                  value={isAdmin ? officeId : scopedOfficeId}
-                  onChange={(e) => setOfficeId(e.target.value)}
-                  disabled={isEmployee}
-                >
-                  {visibleOffices.map((o) => (
-                    <option key={o.id} value={o.id}>
-                      {o.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div>
                 <label htmlFor="departmentId" className="text-sm text-slate-600">ฝ่ายงาน</label>
                 <select
                   id="departmentId"
                   className="select"
-                  value={isAdmin ? departmentId : scopedDepartmentId}
+                  value={scopedDepartmentId}
                   onChange={(e) => setDepartmentId(e.target.value)}
-                  disabled={isEmployee}
+                  disabled={true}
                 >
                   {visibleDepartments.map((d) => (
                     <option key={d.id} value={d.id}>
@@ -403,25 +406,6 @@ const BookingPage = () => {
               </div>
             </div>
 
-            {strategy === 'ASSIGNED' && (
-              <div>
-                <label htmlFor="seatId" className="text-sm text-slate-600">ที่นั่ง</label>
-                <select
-                  id="seatId"
-                  className="select"
-                  value={seatId ?? ''}
-                  onChange={(e) => setSeatId(e.target.value || null)}
-                >
-                  <option value="">เลือกที่นั่ง</option>
-                  {filteredSeats.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.seatCode}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-
             <div className="flex gap-3">
               <button className="btn-primary" type="submit" disabled={bookingMutation.isPending}>
                 {editing ? 'อัปเดตการจอง' : 'บันทึกการจอง'}
@@ -431,7 +415,6 @@ const BookingPage = () => {
                 type="button"
                 onClick={() => {
                   setEditing(null);
-                  setSeatId(null);
                 }}
               >
                 ล้างฟอร์ม
@@ -442,19 +425,74 @@ const BookingPage = () => {
 
         <div className="space-y-4">
           <div className="card p-6">
-            <h3 className="text-lg font-display">Availability</h3>
-            <p className="text-sm text-slate-500">
-              {strategy === 'UNASSIGNED'
-                ? 'แสดงจำนวนที่นั่งคงเหลือแบบ capacity-based'
-                : 'แสดงจำนวนที่นั่งที่ยังว่างในวันนั้น'}
-            </p>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h3 className="text-lg font-display">Availability</h3>
+                <p className="text-sm text-slate-500">
+                  {strategy === 'UNASSIGNED'
+                    ? 'แสดงจำนวนที่นั่งคงเหลือแบบ capacity-based'
+                    : 'แสดงจำนวนที่นั่งที่ยังว่างในวันนั้น'}
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2 justify-end">
+                <div className="flex items-center gap-2 bg-slate-50 rounded-xl px-2 py-1">
+                  <button
+                    type="button"
+                    className="btn-secondary w-full sm:w-auto"
+                    onClick={() => {
+                      const next = DateTime.fromISO(calendarMonthIso, { zone: 'Asia/Bangkok' })
+                        .minus({ months: 1 })
+                        .startOf('month');
+                      setCalendarMonthIso(next.toISODate()!);
+                      setSelectedDate(next.toISODate()!);
+                    }}
+                  >
+                    ‹
+                  </button>
+                  <span className="text-sm font-semibold text-slate-700 min-w-[140px] text-center px-2">
+                    {calendarMonthLabel}
+                  </span>
+                  <button
+                    type="button"
+                    className="btn-secondary w-full sm:w-auto"
+                    onClick={() => {
+                      const next = DateTime.fromISO(calendarMonthIso, { zone: 'Asia/Bangkok' })
+                        .plus({ months: 1 })
+                        .startOf('month');
+                      setCalendarMonthIso(next.toISODate()!);
+                      setSelectedDate(next.toISODate()!);
+                    }}
+                  >
+                    ›
+                  </button>
+                </div>
+                <button
+                  type="button"
+                  className="btn-secondary border border-indigo text-indigo bg-white"
+                  onClick={() => {
+                    const current = DateTime.fromISO(todayIso, { zone: 'Asia/Bangkok' }).startOf('month');
+                    setCalendarMonthIso(current.toISODate()!);
+                    setSelectedDate(todayIso);
+                  }}
+                >
+                  เดือนปัจจุบัน
+                </button>
+              </div>
+            </div>
+            <div className="mt-6">
+              <Calendar
+                month={DateTime.fromISO(calendarMonthIso, { zone: 'Asia/Bangkok' })}
+                dayInfo={availabilityMap}
+                selected={selectedDate}
+                onSelect={(date) => {
+                  setSelectedDate(date);
+                  setCalendarMonthIso(
+                    DateTime.fromISO(date, { zone: 'Asia/Bangkok' }).startOf('month').toISODate()!
+                  );
+                }}
+              />
+            </div>
           </div>
-          <Calendar
-            month={DateTime.fromISO(selectedDate, { zone: 'Asia/Bangkok' })}
-            dayInfo={availabilityMap}
-            selected={selectedDate}
-            onSelect={setSelectedDate}
-          />
         </div>
       </div>
 
@@ -480,7 +518,7 @@ const BookingPage = () => {
                   <td>
                     {formatThaiTime24(b.startAt)} - {formatThaiTime24(b.endAt)}
                   </td>
-                  <td>{filteredSeats.find((s) => s.id === b.seatId)?.seatCode ?? '-'}</td>
+                  <td>-</td>
                   <td>
                     <span className={`badge ${b.status === 'CONFIRMED' ? 'bg-mint/20 text-mint' : 'bg-rose/20 text-rose'}`}>
                       {b.status}
@@ -491,22 +529,11 @@ const BookingPage = () => {
                       className="btn-secondary"
                       onClick={() => {
                         setEditing(b);
-                        setSeatId(b.seatId);
                         setEmployeeId(b.employeeId);
                         const startLocal = toLocalDateTimeInputFromUtc(b.startAt);
                         const endLocal = toLocalDateTimeInputFromUtc(b.endAt);
                         setStartDateTimeLocal(startLocal);
                         setEndDateTimeLocal(endLocal);
-                        const startParts = splitLocalDateTime(startLocal);
-                        const endParts = splitLocalDateTime(endLocal);
-                        if (startParts) {
-                          setStartDate(startParts.date);
-                          setStartTime(startParts.time);
-                        }
-                        if (endParts) {
-                          setEndDate(endParts.date);
-                          setEndTime(endParts.time);
-                        }
                       }}
                     >
                       แก้ไข
@@ -530,8 +557,3 @@ const BookingPage = () => {
 };
 
 export default BookingPage;
-
-
-
-
-

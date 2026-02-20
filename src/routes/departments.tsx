@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState, LoadingState } from '../components/State';
 import { useRepo } from '../data/repo';
 import { departmentSchema } from '../lib/validators';
+import { Department } from '../data/types';
 
 const DepartmentsPage = () => {
   const { repo, isDemo } = useRepo();
@@ -33,8 +34,8 @@ const DepartmentsPage = () => {
     return map;
   }, [seats]);
 
-  const createMutation = useMutation({
-    mutationFn: (input: any) => repo.createDepartment(input),
+  const createMutation = useMutation<Department, Error, Omit<Department, 'id'>>({
+    mutationFn: (input) => repo.createDepartment(input),
     onSuccess: () => {
       setMessage('บันทึกฝ่ายงานแล้ว');
       setEditingId(null);
@@ -46,8 +47,8 @@ const DepartmentsPage = () => {
     }
   });
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: any }) => repo.updateDepartment(id, input),
+  const updateMutation = useMutation<Department, Error, { id: string; input: Omit<Department, 'id'> }>({
+    mutationFn: ({ id, input }) => repo.updateDepartment(id, input),
     onSuccess: () => {
       setMessage('อัปเดตฝ่ายงานแล้ว');
       void queryClient.invalidateQueries({ queryKey: ['departments'] });
@@ -58,8 +59,8 @@ const DepartmentsPage = () => {
     }
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => repo.deleteDepartment(id),
+  const deleteMutation = useMutation<void, Error, string>({
+    mutationFn: (id) => repo.deleteDepartment(id),
     onSuccess: () => {
       setMessage('ลบฝ่ายงานแล้ว');
       void queryClient.invalidateQueries({ queryKey: ['departments'] });
@@ -105,7 +106,7 @@ const DepartmentsPage = () => {
       <div className="card p-6">
         <h2 className="text-lg font-display mb-2">จัดการฝ่ายงาน</h2>
         <p className="text-sm text-slate-500 mb-4">
-          Seat Assigned ใช้ความจุต่อวัน · Seat Unassigned คำนวณจากจำนวนที่นั่งจริงที่ active และ bookable
+          Seat Assigned ใช้ความจุต่อวันจากช่องความจุ · Seat Unassigned ใช้จำนวนที่นั่งที่เปิดให้จอง
         </p>
         {message && <div className="mb-4 rounded-xl bg-indigo/10 px-4 py-2 text-indigo text-sm">{message}</div>}
         <form className="grid gap-4 md:grid-cols-2" onSubmit={handleSubmit}>
@@ -136,7 +137,7 @@ const DepartmentsPage = () => {
               }}
             >
               <option value="ASSIGNED">Seat Assigned</option>
-              <option value="UNASSIGNED">Seat Unassigned</option>
+              <option value="UNASSIGNED">Seat Unassigned (Unlimited)</option>
             </select>
           </div>
           {strategy === 'ASSIGNED' && (
@@ -198,7 +199,7 @@ const DepartmentsPage = () => {
                 <td>
                   {d.strategy === 'ASSIGNED'
                     ? (d.dailyCapacity ?? capacityMap.get(d.id) ?? 0)
-                    : (capacityMap.get(d.id) ?? 0)}
+                    : 'Unlimited'}
                 </td>
                 <td>
                   <span className={`badge ${d.isActive ? 'bg-mint/20 text-mint' : 'bg-rose/20 text-rose'}`}>

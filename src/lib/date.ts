@@ -44,13 +44,13 @@ export const parseThaiBuddhistDateToIso = (input?: string | null) => {
 export const toLocalDateTimeInput = (dateIso: string, time: string) => {
   const dt = DateTime.fromFormat(`${dateIso} ${time}`, 'yyyy-LL-dd HH:mm', { zone: BANGKOK_TZ });
   if (!dt.isValid) return '';
-  return dt.toFormat("yyyy-LL-dd'T'HH:mm");
+  return dt.reconfigure({ outputCalendar: 'gregory' }).toFormat("yyyy-LL-dd'T'HH:mm");
 };
 
 export const toLocalDateTimeInputFromUtc = (isoUtc: string) => {
   const dt = DateTime.fromISO(isoUtc, { zone: 'utc' }).setZone(BANGKOK_TZ);
   if (!dt.isValid) return '';
-  return dt.toFormat("yyyy-LL-dd'T'HH:mm");
+  return dt.reconfigure({ outputCalendar: 'gregory' }).toFormat("yyyy-LL-dd'T'HH:mm");
 };
 
 export const splitLocalDateTime = (value: string) => {

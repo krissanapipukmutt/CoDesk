@@ -1,0 +1,1 @@
+import{j as e}from"./index-CL-jNvSn.js";const t=()=>e.jsxs("div",{className:"card p-10 text-center",children:[e.jsx("h2",{className:"text-xl font-display mb-2",children:"ไม่มีสิทธิ์เข้าถึง"}),e.jsx("p",{className:"text-slate-500",children:"กรุณาติดต่อผู้ดูแลระบบเพื่อขอสิทธิ์"})]});export{t as default};

@@ -105,10 +105,10 @@ declare
   v_requestor_office_id uuid;
   v_emp_department_id uuid;
   v_emp_office_id uuid;
-  v_strategy codesk.department_strategy;
   v_capacity integer;
   v_max_concurrent integer;
   v_local_date date;
+  v_has_overlap boolean;
 begin
   if p_end_at <= p_start_at then
     raise exception using errcode = 'P0001', message = 'INVALID_RANGE';
@@ -153,35 +153,6 @@ begin
     raise exception using errcode = 'P0001', message = 'UNAUTHORIZED';
   end if;
 
-  -- Department strategy
-  select strategy into v_strategy
-  from codesk.departments
-  where id = p_department_id and is_active = true;
-
-  if not found then
-    raise exception using errcode = 'P0001', message = 'DEPARTMENT_MISMATCH';
-  end if;
-
-  if v_strategy = 'ASSIGNED' then
-    if p_seat_id is null then
-      raise exception using errcode = 'P0001', message = 'SEAT_REQUIRED';
-    end if;
-    if not exists (
-      select 1 from codesk.seats s
-      where s.id = p_seat_id
-        and s.department_id = p_department_id
-        and s.office_id = p_office_id
-        and s.is_active = true
-        and s.is_bookable = true
-    ) then
-      raise exception using errcode = 'P0001', message = 'SEAT_NOT_ALLOWED';
-    end if;
-  else
-    if p_seat_id is not null then
-      raise exception using errcode = 'P0001', message = 'SEAT_NOT_ALLOWED';
-    end if;
-  end if;
-
   -- Holiday closed enforcement (Asia/Bangkok date)
   if exists (
     select 1
@@ -201,63 +172,76 @@ begin
     raise exception using errcode = 'P0001', message = 'HOLIDAY_CLOSED';
   end if;
 
-  if v_strategy = 'UNASSIGNED' then
-    -- Advisory locks per local date for concurrency safety
-    for v_local_date in
-      select d::date from generate_series(
-        (p_start_at at time zone 'Asia/Bangkok')::date,
-        ((p_end_at - interval '1 second') at time zone 'Asia/Bangkok')::date,
-        interval '1 day'
-      ) d
-    loop
-      perform pg_advisory_xact_lock(
-        hashtext(p_department_id::text || ':' || p_office_id::text || ':' || v_local_date::text)
-      );
-    end loop;
+  -- Concurrency: advisory locks per day for capacity check
+  for v_local_date in
+    select d::date from generate_series(
+      (p_start_at at time zone 'Asia/Bangkok')::date,
+      ((p_end_at - interval '1 second') at time zone 'Asia/Bangkok')::date,
+      interval '1 day'
+    ) d
+  loop
+    perform pg_advisory_xact_lock(
+      hashtext(p_department_id::text || ':' || p_office_id::text || ':' || v_local_date::text)
+    );
+  end loop;
 
-    select count(*)
-      into v_capacity
-    from codesk.seats s
-    where s.department_id = p_department_id
-      and s.office_id = p_office_id
-      and s.is_active = true
-      and s.is_bookable = true;
+  select coalesce(d.daily_capacity,
+    (select count(*) from codesk.seats s
+      where s.department_id = p_department_id
+        and s.office_id = p_office_id
+        and s.is_active = true
+        and s.is_bookable = true))
+    into v_capacity
+  from codesk.departments d
+  where d.id = p_department_id and d.is_active = true;
 
-    if v_capacity is null or v_capacity = 0 then
-      raise exception using errcode = 'P0001', message = 'OVER_CAPACITY';
-    end if;
+  if v_capacity is null or v_capacity = 0 then
+    raise exception using errcode = 'P0001', message = 'OVER_CAPACITY';
+  end if;
 
-    with overlapping as (
-      select b.start_at, b.end_at
-      from codesk.bookings b
-      where b.status = 'CONFIRMED'
-        and b.department_id = p_department_id
-        and b.office_id = p_office_id
-        and b.booking_range && tstzrange(p_start_at, p_end_at, '[)')
-    ),
-    timepoints as (
-      select o.start_at as ts from overlapping o
-      union all select p_start_at
-    ),
-    counts as (
-      select t.ts,
-        (select count(*) from overlapping o where o.start_at <= t.ts and o.end_at > t.ts) as cnt
-      from timepoints t
-    )
-    select coalesce(max(cnt), 0)
-      into v_max_concurrent
-    from counts;
+  -- Employee cannot overlap own bookings
+  select exists (
+    select 1
+    from codesk.bookings b
+    where b.employee_id = p_employee_id
+      and b.status = 'CONFIRMED'
+      and b.booking_range && tstzrange(p_start_at, p_end_at, '[)')
+  ) into v_has_overlap;
 
-    if v_max_concurrent + 1 > v_capacity then
-      raise exception using errcode = 'P0001', message = 'OVER_CAPACITY';
-    end if;
+  if v_has_overlap then
+    raise exception using errcode = 'P0001', message = 'CONFLICT';
+  end if;
+
+  with overlapping as (
+    select b.start_at, b.end_at
+    from codesk.bookings b
+    where b.status = 'CONFIRMED'
+      and b.department_id = p_department_id
+      and b.office_id = p_office_id
+      and b.booking_range && tstzrange(p_start_at, p_end_at, '[)')
+  ),
+  timepoints as (
+    select o.start_at as ts from overlapping o
+    union all select p_start_at
+  ),
+  counts as (
+    select t.ts,
+      (select count(*) from overlapping o where o.start_at <= t.ts and o.end_at > t.ts) as cnt
+    from timepoints t
+  )
+  select coalesce(max(cnt), 0)
+    into v_max_concurrent
+  from counts;
+
+  if v_max_concurrent + 1 > v_capacity then
+    raise exception using errcode = 'P0001', message = 'OVER_CAPACITY';
   end if;
 
   insert into codesk.bookings as b (
     office_id, department_id, employee_id, seat_id,
     booking_type, status, start_at, end_at, created_at, updated_at
   ) values (
-    p_office_id, p_department_id, p_employee_id, p_seat_id,
+    p_office_id, p_department_id, p_employee_id, null,
     p_booking_type, 'CONFIRMED', p_start_at, p_end_at, now(), now()
   )
   returning b.id, b.status, b.seat_id, b.start_at, b.end_at, b.created_at
@@ -271,7 +255,7 @@ end;
 $$;
 
 comment on function codesk.create_booking(uuid, uuid, uuid, uuid, codesk.booking_type, timestamptz, timestamptz)
-  is 'Error codes: INVALID_RANGE, UNAUTHORIZED, INACTIVE_EMPLOYEE, DEPARTMENT_MISMATCH, SEAT_REQUIRED, SEAT_NOT_ALLOWED, HOLIDAY_CLOSED, OVER_CAPACITY, CONFLICT';
+  is 'Error codes: INVALID_RANGE, UNAUTHORIZED, INACTIVE_EMPLOYEE, DEPARTMENT_MISMATCH, HOLIDAY_CLOSED, OVER_CAPACITY, CONFLICT';
 
 -- RPC: cancel booking
 create or replace function codesk.cancel_booking(

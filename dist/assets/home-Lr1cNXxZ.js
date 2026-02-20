@@ -1,0 +1,1 @@
+import{u as t,j as e,N as r}from"./index-CL-jNvSn.js";const u=()=>{const{profile:o}=t();return o?o.role==="employee"?e.jsx(r,{to:"/booking",replace:!0}):o.role==="hr"?e.jsx(r,{to:"/booking",replace:!0}):e.jsx(r,{to:"/reports",replace:!0}):e.jsx(r,{to:"/login",replace:!0})};export{u as default};

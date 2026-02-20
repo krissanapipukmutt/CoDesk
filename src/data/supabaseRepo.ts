@@ -112,7 +112,8 @@ export class SupabaseRepo {
       officeId: d.office_id,
       name: d.name,
       strategy: d.strategy,
-      isActive: d.is_active
+      isActive: d.is_active,
+      dailyCapacity: d.daily_capacity ?? null
     }));
   }
 
@@ -209,7 +210,8 @@ export class SupabaseRepo {
         office_id: input.officeId,
         name: input.name,
         strategy: input.strategy,
-        is_active: input.isActive
+        is_active: input.isActive,
+        daily_capacity: input.dailyCapacity ?? null
       })
       .select('*')
       .single();
@@ -219,7 +221,8 @@ export class SupabaseRepo {
       officeId: data.office_id,
       name: data.name,
       strategy: data.strategy,
-      isActive: data.is_active
+      isActive: data.is_active,
+      dailyCapacity: data.daily_capacity ?? null
     } as Department;
   }
 
@@ -230,7 +233,8 @@ export class SupabaseRepo {
         office_id: input.officeId,
         name: input.name,
         strategy: input.strategy,
-        is_active: input.isActive
+        is_active: input.isActive,
+        daily_capacity: input.dailyCapacity ?? null
       })
       .eq('id', id)
       .select('*')
@@ -241,7 +245,8 @@ export class SupabaseRepo {
       officeId: data.office_id,
       name: data.name,
       strategy: data.strategy,
-      isActive: data.is_active
+      isActive: data.is_active,
+      dailyCapacity: data.daily_capacity ?? null
     } as Department;
   }
 

@@ -82,7 +82,7 @@ const AdminUsersPage = () => {
   const linkedEmployeeIds = useMemo(() => new Set(users.map((u: AdminUserRow) => u.employee_id)), [users]);
   const activeEmployees = employees.filter((e) => e.active);
 
-  const createMutation = useMutation({
+  const createMutation = useMutation<any, Error, void>({
     mutationFn: () =>
       repoAny.adminCreateUser({
         employee_id: employeeId,
@@ -102,8 +102,8 @@ const AdminUsersPage = () => {
     }
   });
 
-  const updateRoleMutation = useMutation({
-    mutationFn: (input: { target_user_id: string; role: AdminUserRow['role'] }) =>
+  const updateRoleMutation = useMutation<any, Error, { target_user_id: string; role: AdminUserRow['role'] }>({
+    mutationFn: (input) =>
       repoAny.adminUpdateUserRole(input),
     onSuccess: () => {
       setMessage('อัปเดตสิทธิ์สำเร็จ');
@@ -115,8 +115,8 @@ const AdminUsersPage = () => {
     }
   });
 
-  const deleteMutation = useMutation({
-    mutationFn: (input: { target_user_id: string }) => repoAny.adminDeleteUser(input),
+  const deleteMutation = useMutation<any, Error, { target_user_id: string }>({
+    mutationFn: (input) => repoAny.adminDeleteUser(input),
     onSuccess: () => {
       setMessage('ลบผู้ใช้สำเร็จ');
       void queryClient.invalidateQueries({ queryKey: ['admin-users'] });

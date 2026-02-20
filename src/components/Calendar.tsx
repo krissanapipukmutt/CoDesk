@@ -6,6 +6,7 @@ export type DayInfo = {
   bookings: number;
   remaining?: number;
   isFull?: boolean;
+  isMine?: boolean;
   tooltip?: string;
 };
 
@@ -55,7 +56,9 @@ const Calendar = ({
               onClick={() => onSelect(date)}
               className={`h-24 rounded-xl border text-left p-2 transition ${
                 isCurrentMonth ? 'bg-white' : 'bg-slate-50 text-slate-300'
-              } ${isSelected ? 'border-indigo/60 shadow-glow' : 'border-slate-100'} hover:border-indigo/40`}
+              } ${isSelected ? 'border-indigo/60 shadow-glow' : 'border-slate-100'} ${
+                info?.isMine ? 'bg-indigo/5 border-indigo/40' : ''
+              } hover:border-indigo/40`}
             >
               <div className="text-xs font-semibold text-slate-500">{day.day}</div>
               {info && (

@@ -10,6 +10,7 @@
   | 'CONFLICT'
   | 'NOT_FOUND'
   | 'ALREADY_CANCELLED'
+  | 'SERVICE_UNAVAILABLE'
   | 'UNKNOWN';
 
 export const mapErrorCodeToMessage = (code: ErrorCode) => {
@@ -36,13 +37,16 @@ export const mapErrorCodeToMessage = (code: ErrorCode) => {
       return 'ไม่พบรายการ';
     case 'ALREADY_CANCELLED':
       return 'รายการนี้ถูกยกเลิกแล้ว';
+    case 'SERVICE_UNAVAILABLE':
+      return 'ระบบ Supabase ไม่พร้อมใช้งานชั่วคราว กรุณาลองใหม่';
     default:
       return 'เกิดข้อผิดพลาด กรุณาลองใหม่';
   }
 };
 
-export const parseErrorCode = (message?: string) => {
+export const parseErrorCode = (message?: string | number) => {
   if (!message) return 'UNKNOWN' as const;
+  const msg = String(message).toUpperCase();
   const known = [
     'INVALID_RANGE',
     'UNAUTHORIZED',
@@ -56,6 +60,11 @@ export const parseErrorCode = (message?: string) => {
     'NOT_FOUND',
     'ALREADY_CANCELLED'
   ];
-  const match = known.find((k) => message.includes(k));
-  return (match ?? 'UNKNOWN') as ErrorCode;
+  const match = known.find((k) => msg.includes(k));
+  if (match) return match as ErrorCode;
+
+  const svcDownSignals = ['503', 'SERVICE UNAVAILABLE', 'MAX_LOCKS_PER_TRANSACTION', 'OUT OF SHARED MEMORY', '53200'];
+  if (svcDownSignals.some((sig) => msg.includes(sig))) return 'SERVICE_UNAVAILABLE';
+
+  return 'UNKNOWN' as ErrorCode;
 };

@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { EmptyState, LoadingState } from '../components/State';
 import { useRepo } from '../data/repo';
 import { employeeSchema } from '../lib/validators';
+import { Employee } from '../data/types';
 
 const EmployeesPage = () => {
   const { repo } = useRepo();
@@ -25,7 +26,7 @@ const EmployeesPage = () => {
   const [active, setActive] = useState(true);
   const [message, setMessage] = useState('');
 
-  const createMutation = useMutation({
+  const createMutation = useMutation<Employee, Error, Omit<Employee, 'id'>>({
     mutationFn: repo.createEmployee,
     onSuccess: () => {
       setMessage('บันทึกพนักงานแล้ว');
@@ -36,8 +37,8 @@ const EmployeesPage = () => {
       setMessage(message);
     }
   });
-  const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: any }) => repo.updateEmployee(id, input),
+  const updateMutation = useMutation<Employee, Error, { id: string; input: Omit<Employee, 'id'> }>({
+    mutationFn: ({ id, input }) => repo.updateEmployee(id, input),
     onSuccess: () => {
       setMessage('อัปเดตพนักงานแล้ว');
       void queryClient.invalidateQueries({ queryKey: ['employees'] });
@@ -47,8 +48,8 @@ const EmployeesPage = () => {
       setMessage(message);
     }
   });
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => repo.deleteEmployee(id),
+  const deleteMutation = useMutation<void, Error, string>({
+    mutationFn: (id) => repo.deleteEmployee(id),
     onSuccess: () => {
       setMessage('ลบพนักงานแล้ว');
       void queryClient.invalidateQueries({ queryKey: ['employees'] });

@@ -5,6 +5,7 @@ import Calendar from '../components/Calendar';
 import { EmptyState, LoadingState } from '../components/State';
 import { useRepo } from '../data/repo';
 import { holidaySchema } from '../lib/validators';
+import { Holiday } from '../data/types';
 
 const HolidaysPage = () => {
   const { repo } = useRepo();
@@ -23,16 +24,16 @@ const HolidaysPage = () => {
   const [message, setMessage] = useState('');
   const [selectedDate, setSelectedDate] = useState(DateTime.now().setZone('Asia/Bangkok').toISODate()!);
 
-  const createMutation = useMutation({
+  const createMutation = useMutation<Holiday, Error, Omit<Holiday, 'id'>>({
     mutationFn: repo.createHoliday,
     onSuccess: () => setMessage('เพิ่มวันหยุดแล้ว')
   });
-  const updateMutation = useMutation({
-    mutationFn: ({ id, input }: { id: string; input: any }) => repo.updateHoliday(id, input),
+  const updateMutation = useMutation<Holiday, Error, { id: string; input: Omit<Holiday, 'id'> }>({
+    mutationFn: ({ id, input }) => repo.updateHoliday(id, input),
     onSuccess: () => setMessage('อัปเดตวันหยุดแล้ว')
   });
-  const deleteMutation = useMutation({
-    mutationFn: (id: string) => repo.deleteHoliday(id),
+  const deleteMutation = useMutation<void, Error, string>({
+    mutationFn: (id) => repo.deleteHoliday(id),
     onSuccess: () => setMessage('ลบวันหยุดแล้ว')
   });
 
@@ -49,10 +50,11 @@ const HolidaysPage = () => {
       setMessage('กรอกข้อมูลไม่ครบ');
       return;
     }
+    const normalized = { ...parsed.data, officeId: parsed.data.officeId ?? null };
     if (editingId) {
-      await updateMutation.mutateAsync({ id: editingId, input: parsed.data });
+      await updateMutation.mutateAsync({ id: editingId, input: normalized });
     } else {
-      await createMutation.mutateAsync(parsed.data);
+      await createMutation.mutateAsync(normalized);
     }
   };
 

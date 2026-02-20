@@ -16,14 +16,16 @@ export const sampleDepartments: Department[] = [
     officeId: '11111111-1111-1111-1111-111111111111',
     name: 'Engineering',
     strategy: 'ASSIGNED',
-    isActive: true
+    isActive: true,
+    dailyCapacity: 3
   },
   {
     id: '33333333-3333-3333-3333-333333333333',
     officeId: '11111111-1111-1111-1111-111111111111',
     name: 'Support',
     strategy: 'UNASSIGNED',
-    isActive: true
+    isActive: true,
+    dailyCapacity: null
   }
 ];
 

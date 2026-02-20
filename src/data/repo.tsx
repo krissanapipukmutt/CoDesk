@@ -79,6 +79,7 @@ export const RepoProvider = ({
   const [ready, setReady] = useState(false);
   const [session, setSession] = useState<SessionInfo | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const forceDemo = (import.meta as any)?.env?.VITE_FORCE_DEMO === 'true';
 
   const switchToDemo = () => {
     const demo = new SampleRepo() as unknown as RepoApi;
@@ -88,7 +89,7 @@ export const RepoProvider = ({
 
   useEffect(() => {
     const init = async () => {
-      if (!hasSupabaseEnv) {
+      if (forceDemo || !hasSupabaseEnv) {
         switchToDemo();
         setReady(true);
         return;
@@ -109,7 +110,7 @@ export const RepoProvider = ({
 
   useEffect(() => {
     if (!ready) return;
-    let unsubscribe = () => void 0;
+    let unsubscribe: () => void = () => {};
     const initAuth = async () => {
       const current = await repo.getSession();
       setSession(current);
@@ -145,7 +146,7 @@ export const RepoProvider = ({
   useEffect(() => {
     if (!ready || isDemo) return;
     const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-      if (event?.type !== 'queryUpdated') return;
+      if (event?.type !== 'updated') return;
       const state = event.query.state;
       if (state.status !== 'error') return;
       const message =

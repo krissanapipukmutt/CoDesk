@@ -103,11 +103,11 @@ export const buildUtilization = (bookings: Booking[], seats: Seat[]): ReportUtil
         const row = map.get(key) ?? {
           office_id: b.officeId,
           department_id: b.departmentId,
-          local_date: seg.date,
-          booked_minutes: 0,
-          capacity_minutes: seatCount * 1440,
-          utilization_pct: 0
-        };
+        local_date: seg.date,
+        booked_minutes: 0,
+        capacity_minutes: seatCount * 1440,
+        utilization_pct: 0
+      };
         row.booked_minutes += seg.end.diff(seg.start, 'minutes').minutes;
         row.utilization_pct = row.capacity_minutes
           ? Math.round((row.booked_minutes / row.capacity_minutes) * 10000) / 100
@@ -136,8 +136,8 @@ export const buildPeakTimes = (bookings: Booking[]): ReportPeakTimes[] => {
         office_id: b.officeId,
         department_id: b.departmentId,
         local_date: slotStart.toISODate()!,
-        slot_start_local: slotStart.toISO(),
-        slot_end_local: slotEnd.toISO(),
+        slot_start_local: slotStart.toISO() ?? '',
+        slot_end_local: slotEnd.toISO() ?? '',
         concurrent_bookings: concurrent
       });
       cursor = cursor.plus({ minutes: 30 });
