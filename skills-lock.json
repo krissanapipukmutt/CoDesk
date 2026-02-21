@@ -1,0 +1,95 @@
+{
+  "version": 1,
+  "skills": {
+    "azure-rbac": {
+      "source": "microsoft/github-copilot-for-azure",
+      "sourceType": "github",
+      "computedHash": "604aae89af9155281545cb21c98e55643247f25fa4b8469a2c67c76615c15304"
+    },
+    "database-schema-designer": {
+      "source": "softaworks/agent-toolkit",
+      "sourceType": "github",
+      "computedHash": "6a26ca15216bb4bfee66ebf813edcb1e31a8002f3f641f16f550df814b522217"
+    },
+    "dotnet-backend-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "8e3f80d9f1c4fa28d9903ee027fc0ed741b6d0f213532a6b9ef78e192674ce86"
+    },
+    "e2e-testing-patterns": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "5b76a0209fee373a3cdf22d241fb6bf275e19fc69f92915e07c6448538a14e9d"
+    },
+    "generate-swagger-docs": {
+      "source": "qodex-ai/ai-agent-skills",
+      "sourceType": "github",
+      "computedHash": "7d2bc1cb4c97d4fc8bce461bf0cf93e4f69dd40fc18c845cbce3de16d1ccc0f3"
+    },
+    "nextjs-supabase-auth": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "5020657e3491345c4355319621dc0270d91c6a887c63f54a6c6622e00cd213dc"
+    },
+    "playwright-skill": {
+      "source": "sickn33/antigravity-awesome-skills",
+      "sourceType": "github",
+      "computedHash": "843db95f2c734a59f19bcaf92715b970ccdf663d3de28c450b88c23dec835872"
+    },
+    "postgresql-table-design": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "0728424e6f56972333bd60e4f45da0322ac6db273744d863aa2b94f1e95d61ec"
+    },
+    "research-paper-writer": {
+      "source": "ailabs-393/ai-labs-claude-skills",
+      "sourceType": "github",
+      "computedHash": "67be14e704ff0c2972e4fcfd164bffa4504898590ed43276d6ada1a376934748"
+    },
+    "sentry-react-setup": {
+      "source": "getsentry/sentry-agent-skills",
+      "sourceType": "github",
+      "computedHash": "9178fed8fc928b9d4ecc9a1168100fe3100f3bb804be6baf463efb5032f6663e"
+    },
+    "shadcn-ui": {
+      "source": "giuseppe-trisciuoglio/developer-kit",
+      "sourceType": "github",
+      "computedHash": "fc286bef24c7ed9f6d22410ee524b3a83cc38825fb06313d46b5b13a90454135"
+    },
+    "suggest-lucide-icons": {
+      "source": "nweii/agent-stuff",
+      "sourceType": "github",
+      "computedHash": "e65300bc92c624bdaadda1a334d94080e5a9e24ba31f4c41a0e930476b311a05"
+    },
+    "supabase-postgres-best-practices": {
+      "source": "supabase/agent-skills",
+      "sourceType": "github",
+      "computedHash": "9c87c315aed143ee3b34bec8117100f5035e0df09e6b23e1ecc772cff434c9ad"
+    },
+    "tailwind-design-system": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "d0e4d2ba5a99cdc6e264d3927d1d81e85e79f551c8e246fa0a86123217eaad94"
+    },
+    "tanstack-start-best-practices": {
+      "source": "deckardger/tanstack-agent-skills",
+      "sourceType": "github",
+      "computedHash": "50c1b6d9b35b05927fa0c81962d560634385c9567b7b1d66396b171965b33105"
+    },
+    "typescript-advanced-types": {
+      "source": "wshobson/agents",
+      "sourceType": "github",
+      "computedHash": "a03a83996ae9d2f4dd6d4db08899d61761c7d5351bce4c695d20a21197742a36"
+    },
+    "vercel-react-best-practices": {
+      "source": "vercel-labs/agent-skills",
+      "sourceType": "github",
+      "computedHash": "4365be772fd3b41994a72ad478472c6d680678e7f3859860ab010e9c46e48ee0"
+    },
+    "vitest": {
+      "source": "antfu/skills",
+      "sourceType": "github",
+      "computedHash": "669c7275f7e1379b06b2bcfa593603aead4c983b951c7e8edbc09640aa38d0a1"
+    }
+  }
+}

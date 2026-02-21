@@ -1,0 +1,10 @@
+-- ============================================================
+-- co_desk | 02_create_indexes_and_constraints.sql
+-- Status: Deprecated in this phase
+--
+-- IMPORTANT:
+--   As requested, table creation, constraints, and indexes were merged into:
+--   `database/sql/01_create_schema_and_tables.sql`
+--
+-- This file is intentionally kept as a no-op placeholder for compatibility.
+-- ============================================================
