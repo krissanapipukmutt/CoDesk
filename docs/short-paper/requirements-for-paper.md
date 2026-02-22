@@ -9,6 +9,7 @@
 
 หมายเหตุสำคัญ:
 - Requirement `SEC-01` ถูกเพิ่มจากข้อกำกับงานรอบนี้ที่กำหนดว่า "ห้ามตกหล่น Supabase Auth/RLS" เพื่อไม่ให้ RLS หลุดจาก narrative แม้ใน raw business list จะระบุ Auth ชัดเจนมากกว่า RLS
+- Requirement extension รอบวันที่ 2026-02-22 เพิ่มรายละเอียดเชิงความปลอดภัยและกระบวนการสำหรับการสร้างผู้ใช้ใน `auth.users` โดย `admin` ผ่าน backend เท่านั้น
 
 ## 2) Requirement Register (ครบทุกข้อ/ข้อย่อย พร้อมรหัส)
 
@@ -66,6 +67,9 @@
 - [UR-02] แสดงเมนู/สิทธิ์ตาม role | หมวดหลัก: ขอบเขตฟังก์ชันและบทบาทผู้ใช้ | บทที่เกี่ยวข้อง: 1,3 | สถานะ: จำเป็นต่อ narrative
 - [UR-03] มีหน้า “ผู้ใช้” สำหรับสร้าง user | หมวดหลัก: ความต้องการระบบและกระบวนการทำงาน | บทที่เกี่ยวข้อง: 3 | สถานะ: จำเป็นต่อ narrative
 - [UR-04] จำกัดการสร้าง user ให้เฉพาะ admin | หมวดหลัก: ขอบเขตฟังก์ชันและบทบาทผู้ใช้ | บทที่เกี่ยวข้อง: 1,3 | สถานะ: จำเป็นต่อ narrative
+- [UR-05] Admin ต้องสามารถสร้างผู้ใช้ใหม่ใน Supabase Auth (`auth.users`) ผ่านหน้าเว็บระบบได้ | หมวดหลัก: ขอบเขตฟังก์ชันและบทบาทผู้ใช้ | บทที่เกี่ยวข้อง: 1,3 | สถานะ: จำเป็นต่อ narrative
+- [UR-06] Flow การสร้างผู้ใช้ต้องผ่าน backend/server-side secure endpoint เท่านั้น (frontend เรียก backend endpoint เท่านั้น) | หมวดหลัก: ความต้องการระบบและกระบวนการทำงาน | บทที่เกี่ยวข้อง: 2,3 | สถานะ: จำเป็นต่อ narrative
+- [UR-07] หลังสร้าง auth user สำเร็จ ต้องสร้าง/อัปเดตโปรไฟล์ใน `co_desk.profiles` พร้อมกำหนด role/department/status | หมวดหลัก: entities/relationships/constraints ของฐานข้อมูล | บทที่เกี่ยวข้อง: 1,3 | สถานะ: จำเป็นต่อ narrative
 
 ### 2.8 Authentication / Login
 - [AUTH-00] ต้องมีระบบ Authentication / Login | หมวดหลัก: ปัญหาทางธุรกิจและแรงจูงใจ | บทที่เกี่ยวข้อง: 1,2,3 | สถานะ: จำเป็นต่อ narrative
@@ -81,6 +85,8 @@
 ### 2.10 Format / Security Guardrail
 - [FMT-01] รูปแบบวันที่ทั้งหมดต้องเป็น `YYYY-MM-DD` เท่านั้น | หมวดหลัก: ประเด็นเชิงทฤษฎี/เทคโนโลยีที่เกี่ยวข้อง | บทที่เกี่ยวข้อง: 2,3 | สถานะ: จำเป็นต่อ narrative
 - [SEC-01] ต้องคงกติกา Supabase Auth/RLS ไว้ใน narrative และการออกแบบ (ไม่ตกหล่น RLS) | หมวดหลัก: ประเด็นเชิงทฤษฎี/เทคโนโลยีที่เกี่ยวข้อง | บทที่เกี่ยวข้อง: 2,3 | สถานะ: จำเป็นต่อ narrative
+- [SEC-02] ห้ามใช้/ห้าม expose `SUPABASE_SERVICE_ROLE_KEY` ใน frontend และต้องใช้เฉพาะฝั่ง server | หมวดหลัก: ประเด็นเชิงทฤษฎี/เทคโนโลยีที่เกี่ยวข้อง | บทที่เกี่ยวข้อง: 2,3 | สถานะ: จำเป็นต่อ narrative
+- [SEC-03] Backend ต้องตรวจสิทธิ์ว่า caller เป็น `admin` ก่อนเรียก Supabase Admin API | หมวดหลัก: ความต้องการระบบและกระบวนการทำงาน | บทที่เกี่ยวข้อง: 2,3 | สถานะ: จำเป็นต่อ narrative
 
 ### 2.11 Clarification Requirements (ยืนยันเพิ่มเติมจากผู้ใช้)
 - [CLR-01] ค่าขั้นต่ำของรายงานจาก views ต้องเป็นอย่างน้อย 5 รายงาน | หมวดหลัก: ความต้องการระบบและกระบวนการทำงาน | บทที่เกี่ยวข้อง: 1,3 | สถานะ: จำเป็นต่อ narrative
@@ -89,26 +95,33 @@
 - [CLR-04] ขอบเขต HR ยืนยันว่าเห็นและจองเฉพาะบริบทฝ่ายเดียวกัน/ตนเอง และห้ามจองให้ผู้อื่น | หมวดหลัก: ขอบเขตฟังก์ชันและบทบาทผู้ใช้ | บทที่เกี่ยวข้อง: 1,3 | สถานะ: จำเป็นต่อ narrative
 - [CLR-05] กรณีเกิดการจองพร้อมกันจน over-capacity ให้ยึดกติกา capacity เดิม: ห้ามเกินความจุที่กำหนด | หมวดหลัก: entities/relationships/constraints ของฐานข้อมูล | บทที่เกี่ยวข้อง: 1,3 | สถานะ: จำเป็นต่อ narrative (รายละเอียดวิธีควบคุม concurrent เป็น implementation ภายหลัง)
 
+### 2.12 User Provisioning Validation / Audit (เพิ่มจาก requirement รอบล่าสุด)
+- [VAL-01] ต้องตรวจสอบ email ซ้ำก่อนสร้างผู้ใช้ใหม่ | หมวดหลัก: ความต้องการระบบและกระบวนการทำงาน | บทที่เกี่ยวข้อง: 3 | สถานะ: จำเป็นต่อ narrative
+- [VAL-02] ต้องตรวจสอบความถูกต้องของ role ก่อนสร้าง/อัปเดตโปรไฟล์ | หมวดหลัก: entities/relationships/constraints ของฐานข้อมูล | บทที่เกี่ยวข้อง: 2,3 | สถานะ: จำเป็นต่อ narrative
+- [VAL-03] ต้องตรวจสอบว่า department มีอยู่จริงก่อนผูกโปรไฟล์ | หมวดหลัก: entities/relationships/constraints ของฐานข้อมูล | บทที่เกี่ยวข้อง: 2,3 | สถานะ: จำเป็นต่อ narrative
+- [VAL-04] ต้องตรวจสอบ status ให้เป็นค่าที่ระบบรองรับก่อนบันทึก | หมวดหลัก: entities/relationships/constraints ของฐานข้อมูล | บทที่เกี่ยวข้อง: 2,3 | สถานะ: จำเป็นต่อ narrative
+- [AUD-01] ควรมี audit log สำหรับการสร้าง/แก้ไขผู้ใช้โดย admin | หมวดหลัก: ความต้องการระบบและกระบวนการทำงาน | บทที่เกี่ยวข้อง: 3 | สถานะ: จำเป็นต่อ narrative (รูปแบบตารางจริงเป็น implementation ภายหลัง)
+
 ## 3) จัดกลุ่ม requirements ตามหมวดที่กำหนด
 
 ### 3.1 ปัญหาทางธุรกิจและแรงจูงใจ (ใช้ในบทที่ 1)
-- IDs: `REP-00`, `UR-00`, `AUTH-00`, `SB-00`, `CAL-00`, `DEP-00`, `EMP-00`, `HOL-00`
+- IDs: `REP-00`, `UR-00`, `AUTH-00`, `SB-00`, `CAL-00`, `DEP-00`, `EMP-00`, `HOL-00`, `UR-05`
 - แกนเนื้อหา: องค์กรต้องมีระบบจองที่นั่งที่ควบคุมสิทธิ์ได้ ตรวจสอบได้ และมีรายงานเชิงบริหาร
 
 ### 3.2 ขอบเขตฟังก์ชันและบทบาทผู้ใช้ (ใช้ในบทที่ 1)
-- IDs: `SB-06`, `SB-08`, `CAL-03`, `DEP-01`, `EMP-01`, `REP-02`, `UR-01`, `UR-02`, `UR-04`, `ROLE-00`, `ROLE-01`, `ROLE-02`, `ROLE-03`, `CLR-02`, `CLR-04`
+- IDs: `SB-06`, `SB-08`, `CAL-03`, `DEP-01`, `EMP-01`, `REP-02`, `UR-01`, `UR-02`, `UR-04`, `UR-05`, `ROLE-00`, `ROLE-01`, `ROLE-02`, `ROLE-03`, `CLR-02`, `CLR-04`
 - แกนเนื้อหา: ขอบเขตความสามารถแยกตาม role `employee/hr/admin` อย่างชัดเจน
 
 ### 3.3 ประเด็นเชิงทฤษฎี/เทคโนโลยีที่เกี่ยวข้อง (ใช้ในบทที่ 2)
-- IDs: `AUTH-01`, `SEC-01`, `SB-10`, `FMT-01`, `SB-05`, `CLR-03`
+- IDs: `AUTH-01`, `SEC-01`, `SEC-02`, `SEC-03`, `SB-10`, `FMT-01`, `SB-05`, `CLR-03`, `VAL-02`, `VAL-03`, `VAL-04`
 - แกนเนื้อหา: Supabase Auth + RLS, timezone `Asia/Bangkok`, รูปแบบวันที่มาตรฐาน `YYYY-MM-DD`
 
 ### 3.4 ความต้องการระบบและกระบวนการทำงาน (ใช้ในบทที่ 3)
-- IDs: `SB-01`, `SB-02`, `SB-03`, `SB-07`, `CAL-01`, `CAL-02`, `CAL-04`, `DEP-02`, `DEP-04`, `EMP-02`, `EMP-04`, `HOL-01`, `HOL-03`, `REP-01`, `REP-03`, `UR-03`, `AUTH-02`, `CLR-01`
+- IDs: `SB-01`, `SB-02`, `SB-03`, `SB-07`, `CAL-01`, `CAL-02`, `CAL-04`, `DEP-02`, `DEP-04`, `EMP-02`, `EMP-04`, `HOL-01`, `HOL-03`, `REP-01`, `REP-03`, `UR-03`, `UR-06`, `AUTH-02`, `CLR-01`, `VAL-01`, `AUD-01`
 - แกนเนื้อหา: ลำดับงานจอง/แก้ไข/ยกเลิก, ปฏิทิน, จัดการข้อมูลหลัก, รายงาน, demo flow
 
 ### 3.5 entities / relationships / constraints ของฐานข้อมูล (ใช้ในบทที่ 3)
-- IDs: `SB-04`, `SB-09`, `DEP-03`, `DEP-03A`, `DEP-03B`, `EMP-03`, `HOL-02`, `CLR-05`
+- IDs: `SB-04`, `SB-09`, `DEP-03`, `DEP-03A`, `DEP-03B`, `EMP-03`, `HOL-02`, `UR-07`, `VAL-02`, `VAL-03`, `VAL-04`, `CLR-05`
 - แกนเนื้อหา: uniqueness, overlap conflict, capacity rule, โครงสร้างข้อมูลพนักงาน/วันหยุด
 
 ## 4) Traceability Matrix เบื้องต้น (Requirement ID -> Chapter Relevance)
@@ -132,14 +145,18 @@
 | REP-02, REP-03 | สูง | ต่ำ | สูง | สิทธิ์รายงานและรูปแบบ filter |
 | UR-00, UR-01, UR-02, UR-04 | สูง | กลาง | สูง | RBAC และเมนูตามสิทธิ์ |
 | UR-03 | ต่ำ | ต่ำ | สูง | กระบวนการสร้างผู้ใช้ |
+| UR-05, UR-06, UR-07 | สูง | กลาง | สูง | Admin user provisioning ผ่าน backend และ profile sync |
 | AUTH-00, AUTH-01 | สูง | สูง | สูง | Authentication stack และการเข้าถึงระบบ |
 | AUTH-02 | ต่ำ | ต่ำ | กลาง | โหมดสาธิต (DEMO) |
 | ROLE-00, ROLE-01, ROLE-02, ROLE-03 | สูง | กลาง | สูง | Narrative บทบาทผู้ใช้หลัก |
 | FMT-01 | ต่ำ | สูง | สูง | มาตรฐานรูปแบบวันที่ทั้งระบบ |
 | SEC-01 | กลาง | สูง | สูง | RLS เป็นเงื่อนไขความปลอดภัยระดับฐานข้อมูล |
+| SEC-02, SEC-03 | กลาง | สูง | สูง | Secret management และ admin authorization ใน provisioning flow |
 | CLR-01, CLR-02, CLR-04 | สูง | ต่ำ | สูง | คำยืนยันเชิงสิทธิ์และขอบเขตธุรกิจเพิ่มเติม |
 | CLR-03 | ต่ำ | สูง | สูง | ยืนยันระดับความละเอียดข้อมูลเวลา |
 | CLR-05 | สูง | ต่ำ | สูง | ยืนยันพฤติกรรมเมื่อเกิด over-capacity พร้อมกัน |
+| VAL-01, VAL-02, VAL-03, VAL-04 | ต่ำ | กลาง | สูง | Validation rules สำหรับสร้างผู้ใช้ |
+| AUD-01 | ต่ำ | ต่ำ | สูง | การตรวจสอบย้อนหลังการจัดการผู้ใช้โดย admin |
 
 ## 5) Database-Oriented Structured Analysis (ใช้ในบทที่ 3)
 
@@ -151,6 +168,7 @@
 - [ENT-05] Holiday
 - [ENT-06] Reporting View (logical/reporting layer)
 - [ENT-07] Auth Identity (Supabase Auth)
+- [ENT-08] User Provisioning Audit Log (Admin User Management)
 
 ### 5.2 Relationships (Derived)
 - [REL-01] User N:1 Department
@@ -159,6 +177,8 @@
 - [REL-04] Booking N:1 Department (ตรงหรืออนุมานผ่าน User)
 - [REL-05] Booking N:0..1 HolidayDate (อนุญาตให้ทับวันหยุด แต่มี warning + confirm)
 - [REL-06] Reporting View สรุปจาก Booking/User/Department/Holiday
+- [REL-07] Auth Identity 1:1 User Profile (หลัง provisioning)
+- [REL-08] Admin User Management Log N:1 Actor Profile และ N:1 Target Profile (ออกแบบสำหรับ phase implementation)
 
 ### 5.3 Constraints (Derived)
 - [CST-01] ห้าม user เดียวกันจองทับช่วงเวลาเดียวกัน (`SB-04`)
@@ -176,6 +196,12 @@
 - [CST-13] HR ไม่สามารถจองแทนผู้อื่น และเห็นเฉพาะฝ่ายเดียวกัน (`ROLE-02`, `CLR-04`)
 - [CST-14] การจองย้อนหลังต้องบังคับสิทธิ์ตาม role/user (`SB-03`, `CLR-02`)
 - [CST-15] กรณีจองพร้อมกันที่ชน capacity ต้องคงเงื่อนไขไม่เกินความจุ (`SB-09`, `DEP-03`, `CLR-05`)
+- [CST-16] Admin provisioning ต้องสร้างบัญชีใน `auth.users` ผ่าน backend endpoint เท่านั้น (`UR-05`, `UR-06`)
+- [CST-17] `SUPABASE_SERVICE_ROLE_KEY` ต้องอยู่ฝั่ง server เท่านั้น (`SEC-02`)
+- [CST-18] Backend ต้อง authorize caller ว่าเป็น `admin` ก่อนเรียก Supabase Admin API (`SEC-03`)
+- [CST-19] หลังสร้าง auth user สำเร็จ ต้อง sync `co_desk.profiles` พร้อม role/department/status (`UR-07`)
+- [CST-20] ต้อง validate email/role/department/status ก่อนสร้างหรืออัปเดตผู้ใช้ (`VAL-01` ถึง `VAL-04`)
+- [CST-21] ต้องมี audit log สำหรับ user provisioning/management โดย admin (`AUD-01`)
 
 ## 6) BLOCKER Check (บังคับ)
 - ผลการตรวจ: **ไม่พบ BLOCKER**
@@ -185,7 +211,8 @@
 - จำนวน requirement จาก business list (รวมข้อย่อย) ที่ทำรหัสครบ: **49 ข้อ/ข้อย่อย**
 - จำนวน guardrail เพิ่มจากคำสั่งงานก่อนหน้า: **1 ข้อ** (`SEC-01`)
 - จำนวน clarification requirements จากคำตอบล่าสุด: **5 ข้อ** (`CLR-01` ถึง `CLR-05`)
-- จำนวนรวมที่ติดตามในเอกสารนี้: **55 ข้อ/ข้อย่อย**
+- จำนวน requirement extension เพิ่มจากรอบล่าสุด (admin provisioning/security/validation/audit): **11 ข้อ** (`UR-05..UR-07`, `SEC-02..SEC-03`, `VAL-01..VAL-04`, `AUD-01`)
+- จำนวนรวมที่ติดตามในเอกสารนี้: **66 ข้อ/ข้อย่อย**
 
 สถานะความกำกวม:
 1. ระดับ business requirement: **ไม่เหลือข้อกำกวมคงค้าง**

@@ -192,6 +192,31 @@ Foreign Keys:
 - `department_id -> co_desk.departments.department_id`
 - `assigned_by_profile_id -> co_desk.profiles.profile_id` (nullable)
 
+### 2.9 Entity (Optional - Provisioning Governance): `co_desk.user_admin_audit_logs`
+วัตถุประสงค์: รองรับการบันทึกเหตุการณ์สร้าง/แก้ไขผู้ใช้โดย `admin` สำหรับตรวจสอบย้อนหลัง
+
+| Attribute | Logical Data Type | หมายเหตุ |
+|---|---|---|
+| `user_audit_log_id` | bigint (identity) | Primary Key |
+| `target_auth_user_id` | uuid | user id จาก `auth.users` ที่ถูกจัดการ |
+| `target_profile_id` | uuid | profile เป้าหมาย (nullable ในบางกรณี) |
+| `action_code` | text หรือ enum | เช่น `create_user`, `update_user_role`, `deactivate_user` |
+| `actor_profile_id` | uuid | ผู้ปฏิบัติการ (admin) |
+| `actor_role_code` | enum(`role_code`) | ควรเป็น `admin` |
+| `request_payload_json` | jsonb | ข้อมูลคำขอ (mask fields ที่อ่อนไหว) |
+| `result_payload_json` | jsonb | ผลลัพธ์จาก provisioning flow |
+| `result_status` | text | เช่น `success`, `failed` |
+| `action_reason` | text | เหตุผลการดำเนินการ |
+| `action_at` | timestamptz | เวลาเกิดเหตุการณ์ |
+| `request_id` | uuid | correlation id |
+| `ip_address` | inet | client ip |
+| `user_agent` | text | client agent |
+
+Primary Key: `user_audit_log_id`  
+Foreign Keys (proposed):
+- `actor_profile_id -> co_desk.profiles.profile_id`
+- `target_profile_id -> co_desk.profiles.profile_id` (nullable)
+
 ## 3) Relationships และ Cardinality
 | Relationship | Cardinality | Optionality |
 |---|---|---|
@@ -206,6 +231,8 @@ Foreign Keys:
 | `profiles` -> `booking_audit_logs` | 1 : N | log ต้องมี actor |
 | `profiles` -> `user_department_history` | 1 : N | optional table |
 | `departments` -> `user_department_history` | 1 : N | optional table |
+| `profiles` -> `user_admin_audit_logs` (`actor_profile_id`) | 1 : N | optional table (admin governance) |
+| `profiles` -> `user_admin_audit_logs` (`target_profile_id`) | 1 : N | optional table (nullable target) |
 
 หมายเหตุเชิง concept:
 - ความสัมพันธ์ `bookings` กับ `holidays` เป็นความสัมพันธ์เชิงเงื่อนไขจากช่วงวันที่ (ไม่มี FK ตรง) โดยใช้เงื่อนไข `holiday_date between booking_date_start and booking_date_end`
@@ -221,6 +248,9 @@ Foreign Keys:
 | `BR-06` | HR จองให้คนอื่นไม่ได้, Admin จองแทนได้ | `profiles`, `bookings`, `roles` | RPC authorization + RLS (phase ถัดไป) |
 | `BR-07` | รายงานสำหรับ hr/admin | reporting views + `profiles/roles` | view layer + RLS policy (phase ถัดไป) |
 | `BR-08` | Date format `YYYY-MM-DD`, timezone `Asia/Bangkok` | `bookings`, `departments`, `profiles` | date columns + timestamptz + timezone checks |
+| `BR-09` | Admin สร้างผู้ใช้ใน `auth.users` ผ่านหน้าเว็บได้ แต่ต้องผ่าน backend เท่านั้น | `profiles` + Supabase Auth (concept) | backend endpoint + admin authorization |
+| `BR-10` | Provisioning ต้อง validate email/role/department/status ก่อน sync profile | `profiles`, `roles`, `departments` | API validation + DB constraints |
+| `BR-11` | ต้องมี audit log สำหรับการจัดการผู้ใช้โดย admin | `user_admin_audit_logs` (proposed) | transactional write ใน provisioning flow |
 
 ## 5) Candidate Constraints และ Indexes
 
@@ -233,6 +263,8 @@ Foreign Keys:
 6. `bookings_no_overlap_per_user_excl` (GiST exclude)
 7. `department_capacity_policy_no_overlap_excl` (GiST exclude)
 8. capacity mode consistency checks (`limited` vs `unlimited`)
+9. (proposed) `user_admin_audit_logs.action_code` domain/check
+10. (proposed) `user_admin_audit_logs.result_status` domain/check
 
 ### 5.2 Candidate Indexes
 1. FK indexes ทุกจุดที่ join บ่อย (`profiles.department_id`, `profiles.role_id`, `bookings.*_profile_id`, `bookings.department_id`)
@@ -240,6 +272,9 @@ Foreign Keys:
 3. Partial index สำหรับ active bookings (`status_code = 'booked'`)
 4. Audit index (`booking_audit_logs(booking_id, action_at desc)`)
 5. Email lookup index (`lower(profiles.email)`)
+6. (proposed) `user_admin_audit_logs(actor_profile_id, action_at desc)`
+7. (proposed) `user_admin_audit_logs(target_auth_user_id, action_at desc)`
+8. (proposed) `user_admin_audit_logs(request_id)`
 
 ## 6) หมายเหตุสำหรับ Supabase PostgreSQL Implementation
 1. ใช้ schema `co_desk` สำหรับ object หลักทั้งหมด
@@ -247,6 +282,8 @@ Foreign Keys:
 3. แนะนำลำดับ migration: types -> master tables -> dependent tables -> constraints/indexes -> views -> RPC -> RLS
 4. ในรอบ design นี้ RLS ยังเป็น design intent; ให้ implement policy แยกใน phase ถัดไป
 5. กรณี capacity และ holiday confirmation ต้องใช้ transactional RPC/function เพิ่มเติมเพื่อกัน race condition
+6. งานสร้างผู้ใช้ระดับ admin ต้องเรียก Supabase Admin API จาก backend เท่านั้น และต้องเก็บ service role key ฝั่ง server
+7. Provisioning flow ควรเป็น atomic ขั้นต่ำ: create `auth.users` -> upsert `co_desk.profiles` -> write admin audit log (ถ้าล้มเหลวต้องมี error/audit state)
 
 ## 7) ฟิลด์ที่จำเป็นสำหรับ Reporting Views
 
@@ -262,7 +299,7 @@ Foreign Keys:
 ## 8) แนวทางการวาดรูป ERD
 เพื่อให้วาด ERD ได้สอดคล้องกันไม่ว่าใช้คนหรือ AI ตัวอื่น ให้ใช้กติกานี้:
 1. ใช้ Crow's Foot notation
-2. วางตาราง master ซ้ายไปขวา: `roles`, `departments`, `profiles`, `department_capacity_policies`, `holidays`, `bookings`, `booking_audit_logs`
+2. วางตาราง master ซ้ายไปขวา: `roles`, `departments`, `profiles`, `department_capacity_policies`, `holidays`, `bookings`, `booking_audit_logs` (และ `user_admin_audit_logs` เป็น optional governance layer)
 3. แสดง PK/FK ชัดเจนทุกตาราง (tag `PK`, `FK`)
 4. แสดง optionality ที่คีย์ nullable เช่น `cancelled_by_profile_id`, `created_by_profile_id`
 5. แสดง relationship เชิงเงื่อนไข `bookings` <-> `holidays` เป็นเส้น dashed/annotation (logical relation, no direct FK)
@@ -276,7 +313,8 @@ Foreign Keys:
 | `GAP-01` | การบังคับ HR/Admin scope ยังไม่ enforce ด้วย RLS จริง | เสี่ยง access เกินสิทธิ์ถ้าเรียก DB ตรง | เพิ่ม RLS policies + secure RPC ใน phase implementation |
 | `GAP-02` | Capacity check เชิง concurrency ยังไม่ปิดจบด้วย constraint อย่างเดียว | เสี่ยง over-capacity กรณีจองพร้อมกัน | Implement transactional RPC (lock + recheck + atomic write) |
 | `GAP-03` | Holiday confirm เป็น cross-table rule | CHECK constraint ทำไม่ได้ตรง | ใช้ RPC validate ก่อน insert/update และบันทึก audit |
-| `GAP-04` | User provisioning flow (`admin only`) ยังไม่ผูกกับ API/UI | ไม่ครบ flow เชิงปฏิบัติการ | ผูก Supabase Auth admin flow + backend authorization |
+| `GAP-04` | User provisioning flow (`admin only`) ยังไม่ผูกกับ API/UI แบบสมบูรณ์ | ไม่ครบ flow เชิงปฏิบัติการ | ผูก Supabase Auth admin flow + backend authorization + profile sync |
+| `GAP-05` | ยังไม่มีตาราง audit เฉพาะงานจัดการผู้ใช้ใน SQL artifacts ปัจจุบัน | การตรวจสอบย้อนหลัง user governance ยังไม่ละเอียดพอ | เพิ่ม `co_desk.user_admin_audit_logs` ใน phase implementation และผูกกับ backend provisioning endpoint |
 
 ## 10) สรุปความพร้อมสำหรับการวาด ERD
 สเปกนี้พร้อมนำไปวาด ERD ได้ทันที โดยมี entities, keys, relationships, business rules, constraints/index candidates, และ implementation notes ครบตาม requirement ของเฟสบทที่ 3 และรักษาความสอดคล้องกับ schema `co_desk` สำหรับการพัฒนาระยะถัดไป

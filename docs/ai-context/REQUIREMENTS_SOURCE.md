@@ -131,3 +131,20 @@ menu นี้ใช้ได้เฉพาะ Role Hr และ Admin เท�
 นโยบาย concurrency เมื่อเกิด over-capacity พร้อมกัน
 ตอบ Hr จองที่นั่งได้เฉพาะของตัวเองและเห็นปฏิทินของฝ่ายเดียวกันเท่า แต่สามารถเพิ่ม/ลด/แก้ไข/จัดการพนักงานและฝ่ายได้ แต่ไม่สามารถจองให้ใครได้
 ```
+
+## Raw Requirement (Verbatim) - 2026-02-22 (Admin User Provisioning Extension)
+
+```text
+Requirement เพิ่มเติม (ต้องสะท้อนในเอกสาร):
+- role admin ต้องสามารถสร้างผู้ใช้ใหม่ใน Supabase Auth (auth.users) ได้ผ่านหน้าเว็บระบบ
+- การสร้างผู้ใช้ต้องทำผ่าน backend/server-side secure endpoint เท่านั้น
+- ห้ามใช้/ห้าม expose service role key ใน frontend
+- หลังสร้าง auth user สำเร็จ ต้องสร้าง/อัปเดตข้อมูลโปรไฟล์ใน schema `co_desk` และกำหนด role/department/status
+- ต้องมี validation (email ซ้ำ, role ถูกต้อง, department มีอยู่จริง, status ถูกต้อง)
+- ควรมี audit log สำหรับการจัดการผู้ใช้โดย admin
+
+ข้อกำหนดด้านความปลอดภัย (ต้องระบุชัดในเอกสาร):
+- service role key ใช้เฉพาะฝั่ง server
+- frontend เรียก backend endpoint เท่านั้น
+- backend ต้องตรวจสิทธิ์ว่า caller เป็น admin ก่อนเรียก Supabase Admin API
+```

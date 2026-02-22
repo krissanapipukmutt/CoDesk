@@ -130,3 +130,39 @@
 - อัปเดต context docs ให้ snapshot/phase/status ตรงกันทุกไฟล์
 - สร้าง `OPEN_TASKS.md` เพื่อคุมงานค้างอย่างชัดเจนสำหรับการทำงานต่อข้ามเครื่อง
 - ปิดงานด้วย handoff ที่เครื่องถัดไปเปิดแล้วทำต่อได้ทันทีโดยไม่พึ่งประวัติแชต
+
+### Prompt M (ล่าสุด)
+ผู้ใช้สั่งตรวจ SQL ใน `database/sql` ให้ run-ready บน Supabase/PostgreSQL โดยกำหนดให้:
+1. ตรวจไฟล์ `01`, `03`, `04`, `05` เท่านั้น (ไม่ต้องตรวจ `02`)
+2. ตรวจทั้ง syntax, dependency, naming consistency, Supabase compatibility, และลำดับการรัน
+3. ต้องทำ dry-run execution จริงตามลำดับ `01 -> 03 -> 04 -> 05`
+4. หากพบ error ต้องแก้ไฟล์ทันทีจนผ่าน
+5. ต้องมี verification หลังรัน (schema/tables/views/functions/seed)
+6. อัปเดต `README.md` และ `docs/ai-context/*` ให้สะท้อนผลการตรวจ/การแก้ไข
+
+### Response Strategy สำหรับ Prompt M
+- อ่าน SQL เป้าหมายทั้งหมดแบบ static เพื่อตรวจ dependency และ naming ก่อน execute
+- พยายามใช้ Docker สำหรับ dry-run ก่อน แต่ daemon ไม่พร้อมใช้งาน จึงติดตั้ง PostgreSQL local (Homebrew) เพื่อรันทดสอบจริงแทน
+- รัน execute test ด้วย `psql -v ON_ERROR_STOP=1` ตามลำดับไฟล์ที่กำหนด
+- รันซ้ำรอบที่สองบนฐานเดิมเพื่อเช็ก idempotency เชิงปฏิบัติ
+- รัน verification queries และ smoke tests ของ views/functions เพื่อยืนยัน compile/runtime readiness
+- อัปเดต README + ai-context files ให้มีหลักฐานการตรวจสอบจริงที่ตรวจย้อนกลับได้
+
+### Prompt N (ล่าสุด)
+ผู้ใช้สั่งอัปเดตเอกสาร Short Paper บทที่ 1-3 และ context docs ให้สะท้อน requirement ใหม่ว่า:
+1. `admin` ต้องสร้างผู้ใช้ใหม่ใน Supabase Auth (`auth.users`) ผ่านหน้าเว็บได้
+2. การสร้างผู้ใช้ต้องผ่าน backend/server-side secure endpoint เท่านั้น
+3. ห้าม expose service role key ใน frontend
+4. หลังสร้าง auth user สำเร็จ ต้อง sync `co_desk` profile/role/department/status
+5. ต้องมี validation (email duplicate, role, department, status) และควรมี audit log สำหรับ user management โดย admin
+6. งานรอบนี้เป็น design/documentation update เท่านั้น ห้ามเขียน implementation code
+7. ต้องอัปเดต README และ handoff ให้พร้อมทำงานต่อข้ามเครื่อง
+
+### Response Strategy สำหรับ Prompt N
+- เพิ่ม requirement ใหม่แบบ verbatim ลง `REQUIREMENTS_SOURCE.md`
+- แปลง requirement extension เป็น requirement IDs ใหม่ใน `requirements-for-paper.md` พร้อม traceability และ chapter relevance
+- ปรับบทที่ 1 ให้สะท้อน scope ใหม่ของ admin provisioning โดยไม่ลง implementation detail ลึกเกินไป
+- ปรับบทที่ 2 เพิ่มหลักการ secure administrative provisioning เชื่อม RBAC/least privilege/secret management
+- ปรับบทที่ 3 เพิ่ม flow `Admin UI -> Backend -> Supabase Auth Admin -> Profile Sync`, validation rules, security constraints, และ audit design intent
+- ปรับ ERD design notes ให้รองรับ governance entity/log แบบ proposed (ยังไม่สร้าง SQL ใน phase นี้)
+- อัปเดต DECISIONS, SESSION_LOG, HANDOFF, README ให้พร้อม handoff ข้ามเครื่อง และยืนยันว่าไม่ได้เขียน implementation code

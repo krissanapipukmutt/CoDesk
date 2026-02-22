@@ -3,8 +3,8 @@
 - Project: `co_desk`
 - PostgreSQL Schema: `co_desk`
 - Branch: `feature/CoDesk-03`
-- Snapshot Time: `2026-02-21 23:39:31 +07 (UTC+0700)`
-- Current Phase: ปิดรอบเอกสาร Short Paper บทที่ 1-3 + database-first artifacts + cross-machine handoff persistence
+- Snapshot Time: `2026-02-22 00:35:58 +07 (UTC+0700)`
+- Current Phase: อัปเดตเอกสารบทที่ 1-3 ให้รองรับ requirement เพิ่มเติมเรื่อง Admin User Provisioning (design-only, no implementation code)
 
 ## 1) เป้าหมายหลักของเฟสปัจจุบัน
 1. จัดทำ deliverables สำหรับ Short Paper บทที่ 1-3 ให้พร้อมส่งในเชิงโครงสร้าง
@@ -38,10 +38,11 @@
 ## 4) Requirement Baseline (Confirmed)
 - Source verbatim: `docs/ai-context/REQUIREMENTS_SOURCE.md`
 - Structured analysis: `docs/short-paper/requirements-for-paper.md`
-- Requirement units tracked รวม: **55 ข้อ/ข้อย่อย**
+- Requirement units tracked รวม: **66 ข้อ/ข้อย่อย**
   - Business requirement IDs: 49
   - Guardrail IDs: 1 (`SEC-01`)
   - Clarification IDs: 5 (`CLR-01..CLR-05`)
+  - Provisioning extension IDs: 11 (`UR-05..UR-07`, `SEC-02..SEC-03`, `VAL-01..VAL-04`, `AUD-01`)
 
 กติกาธุรกิจที่ต้องไม่ตกหล่น:
 1. Roles: `employee`, `hr`, `admin`
@@ -52,6 +53,8 @@
 6. Supabase Auth + RLS narrative/design
 7. Timezone `Asia/Bangkok` และเวลา 24 ชั่วโมง
 8. Date format `YYYY-MM-DD`
+9. Admin provisioning ใน `auth.users` ต้องผ่าน backend endpoint เท่านั้น
+10. Service role key เป็น server-only secret และ backend ต้อง authorize caller ว่าเป็น admin
 
 ## 5) Deliverables Status (Current)
 ### 5.1 Short Paper Drafts
@@ -70,6 +73,7 @@
 - `database/sql/03_create_reporting_views.sql` (6 views)
 - `database/sql/04_create_rpc_placeholders.sql` (6 functions)
 - `database/sql/05_seed_demo_minimal.sql` (optional demo seed)
+- Runtime validation status: รันจริงผ่านครบลำดับ `01 -> 03 -> 04 -> 05` ด้วย PostgreSQL-compatible executor (no errors)
 
 ### 5.4 Design Support Docs
 - `docs/short-paper/erd-design-notes.md` (ERD-ready)
@@ -90,7 +94,7 @@
 2. RLS policies ยังเป็น design intent (ยังไม่ลง SQL policy implementation)
 
 ## 7) Assumptions / Decisions Reference
-- ดูรายละเอียดที่ `docs/ai-context/DECISIONS.md` (DEC-01..DEC-07)
+- ดูรายละเอียดที่ `docs/ai-context/DECISIONS.md` (DEC-01..DEC-08)
 - จุดสำคัญ:
   1. ใช้ Bangkok timezone baseline
   2. Single day = ทั้งวัน

@@ -1,6 +1,6 @@
 # OPEN_TASKS
 
-อัปเดตล่าสุด: `2026-02-21 23:39:31 +07`
+อัปเดตล่าสุด: `2026-02-22 00:12:03 +07`
 
 ## High Priority
 1. ปิด blocker `B-01`: ปรับ `docs/short-paper/ch03-methodology-draft.md` ให้ชื่อ field/view/entity ตรงกับ SQL/ERD ล่าสุด
@@ -39,3 +39,4 @@
 ## Notes
 - หากต้องส่ง Short Paper ทันที ให้โฟกัส High Priority ข้อ 1-3 ก่อน
 - งาน Medium/Low เป็น implementation phase ต่อเนื่อง
+- งานตรวจ SQL run-ready (`database/sql/01,03,04,05`) สถานะ: ปิดแล้วเมื่อ `2026-02-22` หลัง execute test ผ่านครบ

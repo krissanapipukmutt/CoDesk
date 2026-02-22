@@ -11,6 +11,8 @@
 
 เมื่อได้แบบจำลองข้อมูลแล้ว จึงกำหนดกระบวนการใช้งานหลักเป็น flow ระดับแนวคิด ได้แก่ การสร้าง/แก้ไข/ยกเลิกการจอง การตรวจสอบความซ้อนทับและความจุ การแจ้งเตือนวันหยุด และการเผยแพร่ข้อมูลผ่าน views สำหรับรายงาน วิธีดำเนินการลักษณะนี้ทำให้บทที่ 3 สามารถเชื่อมโยงต่อไปสู่การพัฒนา backend และ frontend ได้โดยไม่สูญเสียเจตนารมณ์ของ requirement เดิม
 
+สำหรับ requirement เพิ่มเติมด้านการจัดการผู้ใช้ กำหนด flow เฉพาะของผู้ดูแลระบบเป็น `Admin UI -> Backend API (.NET) -> Supabase Auth Admin (auth.users) -> co_desk.profiles sync` โดย backend ต้องเป็นผู้รับผิดชอบการตรวจสิทธิ์ผู้เรียก การเรียก admin API และการซิงก์ข้อมูล role/department/status ใน schema `co_desk` เพื่อให้การจัดการผู้ใช้คงความปลอดภัยและตรวจสอบย้อนหลังได้
+
 ## 3.4 วิธีการออกแบบฐานข้อมูลแบบ Database-first
 การออกแบบฐานข้อมูลยึด schema `co_desk` และกำหนด core entities ให้ครอบคลุมเงื่อนไขทางธุรกิจโดยตรง พร้อมระบุ attributes สำคัญอย่างน้อย 6 รายการต่อ entity ดังตารางต่อไปนี้
 
@@ -20,7 +22,7 @@
 | `departments` | เก็บข้อมูลฝ่ายงานและนโยบายความจุระดับหน่วยงาน | `department_id`, `department_code`, `department_name`, `capacity_mode`, `default_capacity_per_day`, `is_active`, `effective_timezone`, `created_by_profile_id`, `created_at`, `updated_at` |
 | `profiles` | โปรไฟล์ผู้ใช้ที่ผูกกับ Supabase Auth และฝ่ายงาน | `profile_id` (อ้างอิง `auth.users.id`), `employee_code`, `full_name`, `email`, `department_id`, `role_id`, `is_active`, `timezone_name`, `created_at`, `updated_at` |
 | `department_capacity_policies` | นโยบายความจุที่มีช่วงเวลาบังคับใช้ | `policy_id`, `department_id`, `effective_start_date`, `effective_end_date`, `capacity_mode`, `capacity_per_day`, `note_text`, `is_active`, `created_at`, `updated_at` |
-| `bookings` | ธุรกรรมการจองที่นั่งเข้าออฟฟิศ | `booking_id`, `booked_for_profile_id`, `booked_by_profile_id`, `department_id`, `booking_mode`, `booking_date_start`, `booking_date_end`, `start_hour_24`, `end_hour_24`, `holiday_warning_acknowledged`, `status_code`, `created_at`, `updated_at` |
+| `bookings` | ธุรกรรมการจองที่นั่งเข้าออฟฟิศ | `booking_id`, `booked_for_profile_id`, `booked_by_profile_id`, `department_id`, `booking_mode`, `booking_date_start`, `booking_date_end`, `start_at`, `end_at`, `holiday_warning_acknowledged`, `status_code`, `created_at`, `updated_at` |
 | `holidays` | ข้อมูลวันหยุดเพื่อใช้เตือนก่อนยืนยันการจอง | `holiday_id`, `holiday_date`, `holiday_name`, `holiday_description`, `is_active`, `created_by_profile_id`, `created_at`, `updated_at` |
 | `booking_audit_logs` | ประวัติการเปลี่ยนแปลงการจองเพื่อการตรวจสอบ | `audit_log_id`, `booking_id`, `action_code`, `actor_profile_id`, `actor_role_code`, `action_reason`, `old_values_json`, `new_values_json`, `action_at`, `request_id` |
 
@@ -37,26 +39,34 @@
 
 *คำบรรยายรูปที่ 3.2: แผนภาพลำดับกระบวนการตรวจสอบกติกาธุรกิจก่อนบันทึกการจอง*
 
+[Figure 3.3 Placeholder] Admin Provisioning Flow: Admin UI -> Backend Authorization -> Supabase Auth Admin Create User -> Profile/Role/Department Sync -> User Management Audit Log
+
+*คำบรรยายรูปที่ 3.3: แผนภาพกระบวนการสร้างผู้ใช้โดยผู้ดูแลระบบภายใต้การควบคุมความปลอดภัยฝั่งเซิร์ฟเวอร์*
+
 ## 3.6 การออกแบบการตรวจสอบข้อมูลและกติกาทางธุรกิจ
-การตรวจสอบข้อมูลถูกออกแบบให้ทำงานสองชั้น คือชั้นธุรกิจของระบบและชั้นฐานข้อมูล เพื่อให้ลดโอกาสข้อมูลผิดกติกาในกรณีมีการใช้งานพร้อมกัน กติกาสำคัญข้อแรกคือการป้องกันผู้ใช้เดิมจองช่วงเวลาซ้อนกัน โดยตีความช่วงเวลาการจองจาก `booking_date_start/booking_date_end` และ `start_hour_24/end_hour_24` (กรณี `single_day` ให้ถือเป็นทั้งวัน) แล้วตรวจ overlap ก่อนบันทึกทุกครั้ง พร้อมยกเว้นรายการที่ถูกยกเลิกแล้วเท่านั้น
+การตรวจสอบข้อมูลถูกออกแบบให้ทำงานสองชั้น คือชั้นธุรกิจของระบบและชั้นฐานข้อมูล เพื่อให้ลดโอกาสข้อมูลผิดกติกาในกรณีมีการใช้งานพร้อมกัน กติกาสำคัญข้อแรกคือการป้องกันผู้ใช้เดิมจองช่วงเวลาซ้อนกัน โดยตีความช่วงเวลาการจองจาก `booking_date_start/booking_date_end` และ `start_at/end_at` (กรณี `single_day` ให้ถือเป็นทั้งวัน) แล้วตรวจ overlap ก่อนบันทึกทุกครั้ง พร้อมยกเว้นรายการที่ถูกยกเลิกแล้วเท่านั้น
 
 กติกาข้อที่สองคือการควบคุมความจุของฝ่ายงานแบบ `limited/unlimited` หากฝ่ายอยู่ในโหมด `limited` ระบบต้องตรวจจำนวนการจองที่ active ของฝ่ายนั้นในวันหรือช่วงเวลาเดียวกันว่าไม่เกิน `capacity_per_day` ตามนโยบายที่มีผลบังคับใช้ หากอยู่ในโหมด `unlimited` ให้ข้ามการจำกัดจำนวนแต่ยังคงตรวจ booking overlap รายบุคคลตามปกติ กติกาข้อที่สามคือการจองตรงวันหยุด ซึ่งอนุญาตให้จองได้ แต่ต้องมีสถานะยืนยันคำเตือน (`holiday_warning_acknowledged = true`) ก่อนบันทึกจริง ข้อสุดท้ายคือการมองเห็นข้อมูลปฏิทินและรายงาน ต้องยึด role และฝ่ายงานตาม requirement โดยไม่อนุญาตให้ผู้ใช้ข้ามขอบเขตข้อมูลของตน
+
+สำหรับการสร้างผู้ใช้โดย `admin` กำหนด validation เพิ่มเติมในระดับออกแบบ ได้แก่ การตรวจ email ซ้ำก่อนสร้างบัญชีใหม่ การตรวจ role ให้เป็นค่าที่ระบบรองรับ การตรวจว่า department มีอยู่จริง และการตรวจสถานะผู้ใช้ (`is_active` หรือสถานะที่ระบบกำหนด) ก่อนบันทึกลง `co_desk.profiles` หลังสร้าง `auth.users` สำเร็จ เพื่อป้องกันข้อมูลผู้ใช้ไม่สอดคล้องข้ามระบบ
 
 ## 3.7 การออกแบบการควบคุมสิทธิ์ (Role + Database Level)
 การควบคุมสิทธิ์ใช้แนวทางผสาน RBAC และ RLS โดย RBAC กำหนดขอบเขตฟังก์ชันที่ผู้ใช้เห็นบนระบบ ส่วน RLS กำหนดขอบเขตข้อมูลที่อนุญาตให้เข้าถึงได้จริงในระดับแถวข้อมูล บทบาท `employee` และ `hr` จะเห็นข้อมูลปฏิทินเฉพาะฝ่ายเดียวกัน โดย `hr` มีสิทธิ์จัดการข้อมูลฝ่ายและพนักงานรวมถึงดูรายงานได้ แต่จองแทนผู้อื่นไม่ได้ ขณะที่ `admin` สามารถจอง แก้ไข ยกเลิก และมองเห็นข้อมูลทุกฝ่าย รวมถึงสร้างผู้ใช้และกำหนดบทบาทได้
 
 ในระดับฐานข้อมูล การออกแบบ policy เน้นเงื่อนไขการอนุญาตตามตัวตนผู้ใช้ที่มาจาก Supabase Auth และความสัมพันธ์ในตาราง `profiles` เพื่อบังคับใช้กติกาเดียวกับภาคธุรกิจ ลดความเสี่ยงจากการเรียกข้อมูลโดยข้าม business layer และรักษาความสอดคล้องของสิทธิ์ระหว่างหน้าจอ API และฐานข้อมูล
 
+สำหรับงาน provisioning ฝั่งผู้ดูแล ระบบต้องยึดหลัก security-by-design โดยเก็บ `SUPABASE_SERVICE_ROLE_KEY` ไว้เฉพาะฝั่ง server และไม่เผยแพร่ไปยัง frontend ทุกกรณี การเรียก Supabase Admin API ต้องเกิดใน backend endpoint ที่ตรวจสิทธิ์ผู้เรียกว่าเป็น `admin` แล้วเท่านั้น จึงจะทำขั้นตอนสร้าง user และ sync profile ต่อได้ ทั้งนี้ควรบันทึก audit log สำหรับการสร้าง/แก้ไขผู้ใช้โดย `admin` แยกจาก booking audit เพื่อให้ตรวจสอบย้อนหลังการกำกับบัญชีผู้ใช้ได้ชัดเจน
+
 ## 3.8 การออกแบบรายงานด้วย Database Views
 เพื่อรองรับงานบริหาร ระบบกำหนดรายงานจาก database views อย่างน้อย 5 มุมมอง และจำกัดการเข้าถึงไว้ที่ `hr` กับ `admin` โดยตัวอย่าง views ที่วางแผนไว้มีดังนี้
 
 | View | วัตถุประสงค์ | กลุ่มผู้ใช้ที่เห็น |
 |---|---|---|
-| `co_desk.vw_department_daily_utilization` | สรุปจำนวนจองเทียบความจุรายฝ่ายต่อวัน | `hr`, `admin` |
-| `co_desk.vw_booking_calendar_monthly` | สรุปรายการจองรายเดือนสำหรับปฏิทิน | `hr`, `admin` |
-| `co_desk.vw_user_booking_history` | ติดตามประวัติการจองรายบุคคล | `hr`, `admin` |
-| `co_desk.vw_holiday_booking_summary` | สรุปการจองที่ตรงวันหยุดและสถานะการยืนยัน | `hr`, `admin` |
-| `co_desk.vw_booking_audit_trail` | ติดตามการแก้ไข/ยกเลิกย้อนหลังจาก audit logs | `hr`, `admin` |
+| `co_desk.vw_daily_booking_summary_by_department` | สรุปจำนวนจองรายวันต่อฝ่าย | `hr`, `admin` |
+| `co_desk.vw_department_capacity_utilization` | วิเคราะห์การใช้ความจุเทียบ policy รายวัน | `hr`, `admin` |
+| `co_desk.vw_employee_booking_frequency` | ติดตามความถี่การจองรายพนักงานรายเดือน | `hr`, `admin` |
+| `co_desk.vw_holiday_bookings_detail` | สรุปรายการจองที่ทับวันหยุดและสถานะการยืนยัน | `hr`, `admin` |
+| `co_desk.vw_booking_cancellations_summary` | สรุปแนวโน้มการยกเลิกการจอง | `hr`, `admin` |
 
 การออกแบบ views ในลักษณะนี้ช่วยให้การสร้างแดชบอร์ดรายงานทำได้เป็นระบบ และสอดคล้องกับ requirement ที่ต้องรองรับการกรองข้อมูลเชิงคอลัมน์ในภายหลัง โดยไม่ต้องทำให้โครงสร้างธุรกรรมหลักซับซ้อนเกินความจำเป็น
 
@@ -76,6 +86,10 @@
 | `REP-01`, `CLR-01` | reporting views ทั้งชุด | ต้องมีอย่างน้อย 5 views | Reporting dashboard pipeline |
 | `AUTH-01`, `SEC-01` | `profiles` + Supabase Auth | RBAC + RLS ระดับฐานข้อมูล | AuthN/AuthZ enforcement |
 | `UR-04` | `roles`, `profiles` | จำกัดการสร้างผู้ใช้ให้ admin | User provisioning |
+| `UR-05`, `UR-06`, `UR-07` | `profiles` + Supabase `auth.users` | สร้างผู้ใช้ผ่าน backend แล้ว sync โปรไฟล์ | Admin provisioning flow |
+| `SEC-02`, `SEC-03` | Backend API + secret management | service role key server-only + admin authorization | Secure Admin API invocation |
+| `VAL-01`, `VAL-02`, `VAL-03`, `VAL-04` | `profiles`, `roles`, `departments` | validation email/role/department/status | Provisioning validation |
+| `AUD-01` | (ออกแบบเพิ่ม) user management audit log | บันทึกเหตุการณ์จัดการผู้ใช้โดย admin | User governance/audit process |
 
 ## 3.10 สรุปบท
 บทนี้เสนอวิธีดำเนินการที่เชื่อมโยงปัญหาธุรกิจเข้ากับการออกแบบระบบแบบ Database-first โดยกำหนดโครงสร้างข้อมูล ความสัมพันธ์ กติกาธุรกิจ และการควบคุมสิทธิ์ไว้ตั้งแต่ต้นทาง เพื่อให้สามารถพัฒนาระบบต่อได้อย่างมีทิศทางเดียวกันและตรวจสอบย้อนกลับกับ requirement ได้ชัดเจน โดยเฉพาะกติกาวิกฤต ได้แก่ การป้องกันจองซ้อน การควบคุมความจุแผนก การยืนยันการจองวันหยุด และการมองเห็นข้อมูลตามบทบาทภายใต้ Supabase Auth/RLS ทั้งนี้มาตรฐานวันเวลา `YYYY-MM-DD` และ `Asia/Bangkok` ถูกยืนยันเป็น baseline กลางสำหรับทุกโมดูลในระยะพัฒนาถัดไป

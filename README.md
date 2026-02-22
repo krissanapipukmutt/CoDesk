@@ -37,6 +37,7 @@
 6. Reporting Dashboard: รายงานจาก views อย่างน้อย 5 มุมมอง
 7. Users/Roles/RBAC: บทบาท `employee`, `hr`, `admin`
 8. Authentication: Supabase Auth (รองรับ demo flow ในเฟสถัดไป)
+9. Admin User Provisioning (Design): `admin` สร้างผู้ใช้ใน `auth.users` ผ่านหน้าเว็บได้ โดยบังคับ flow ผ่าน backend เท่านั้น
 
 Reference requirements files:
 - `docs/ai-context/REQUIREMENTS_SOURCE.md` (verbatim source)
@@ -57,6 +58,13 @@ Logical architecture (target):
 1. UI Layer (React): booking form, calendar, admin/hr screens, reporting dashboard
 2. API Layer (.NET Web API): business orchestration, authorization, RPC calls
 3. Data Layer (Supabase PostgreSQL): schema `co_desk`, constraints, views, RPC/functions, RLS
+
+Admin provisioning design flow (planned):
+1. Admin UI ส่งคำขอสร้างผู้ใช้ไปที่ backend endpoint
+2. Backend ตรวจสิทธิ์ caller ว่าเป็น `admin`
+3. Backend เรียก Supabase Admin API เพื่อสร้าง user ใน `auth.users`
+4. Backend sync ข้อมูล `co_desk.profiles` (role/department/status)
+5. Backend บันทึก audit log การจัดการผู้ใช้ (planned)
 
 Current repository focus:
 - เอกสารวิเคราะห์ + SQL design artifacts
@@ -133,7 +141,7 @@ Functions ที่กำหนด placeholder แล้ว:
 Role baseline:
 - `employee`: จองเฉพาะตนเอง, ดูบริบทฝ่ายเดียวกัน
 - `hr`: จองเฉพาะตนเอง, จัดการฝ่าย/พนักงานได้, ดูรายงานได้
-- `admin`: สิทธิ์เต็ม, จองแทนได้, จัดการผู้ใช้/บทบาทได้
+- `admin`: สิทธิ์เต็ม, จองแทนได้, จัดการผู้ใช้/บทบาทได้ รวมถึง provisioning ผู้ใช้ใน Supabase Auth ผ่าน backend endpoint
 
 RLS status:
 - อยู่ในระดับ design intent และเอกสารกำกับ
@@ -142,7 +150,15 @@ RLS status:
 ## 11) Authentication
 - ใช้ Supabase Auth เป็นแหล่งตัวตนผู้ใช้
 - `co_desk.profiles.profile_id` ออกแบบให้ map กับ `auth.users.id`
-- การ provisioning user (`admin only`) ยังเป็นงานใน phase implementation
+- การ provisioning user (`admin only`) ถูกออกแบบไว้แล้วสำหรับบทที่ 1-3 และยังเป็นงานใน phase implementation
+
+หลักการ security สำหรับ provisioning:
+1. Frontend เรียกเฉพาะ backend endpoint (ไม่เรียก Supabase Admin API โดยตรง)
+2. `SUPABASE_SERVICE_ROLE_KEY` ต้องเก็บฝั่ง server เท่านั้น
+3. Backend ต้อง authorize ว่า caller เป็น `admin` ก่อนทำ create user
+4. หลัง create `auth.users` สำเร็จ ต้อง sync `co_desk.profiles` พร้อม role/department/status
+5. ต้องมี validation ขั้นต่ำ: email ซ้ำ, role valid, department exists, status valid
+6. ควรมี audit log สำหรับการจัดการผู้ใช้โดย admin
 
 ## 12) Date/Time Standards
 มาตรฐานที่ต้องคงไว้ทุกชั้น:
@@ -273,6 +289,7 @@ docs/short-paper/
 2. RLS policies ยังไม่ implement จริงในฐานข้อมูล
 3. RPC functions ยังเป็น placeholder (ยังไม่ทำ transaction + locking + full authorization)
 4. ยังไม่มี source code frontend/backend ใน repo นี้ (เฟสเอกสาร/ออกแบบเป็นหลัก)
+5. Admin user provisioning ใน Supabase Auth อยู่ในสถานะ design/documented เท่านั้น ยังไม่ implement endpoint จริง
 
 ## 21) Latest Session Change Summary (2026-02-21)
 สรุปการเปลี่ยนแปลงล่าสุดของ session นี้:
@@ -284,3 +301,41 @@ docs/short-paper/
 
 รายละเอียดเชิง timeline:
 - ดู `docs/ai-context/SESSION_LOG.md`
+
+## 22) SQL Runtime Validation Status (2026-02-22)
+สถานะล่าสุด: **ผ่านการรันทดสอบจริง (execution-verified)** บน PostgreSQL-compatible environment
+
+สภาพแวดล้อมที่ใช้ตรวจ:
+1. PostgreSQL `14.21` (Homebrew local instance)
+2. รันด้วย `psql -v ON_ERROR_STOP=1`
+3. ทดสอบตามลำดับจริง:
+   - `database/sql/01_create_schema_and_tables.sql`
+   - `database/sql/03_create_reporting_views.sql`
+   - `database/sql/04_create_rpc_placeholders.sql`
+   - `database/sql/05_seed_demo_minimal.sql`
+
+ผลทดสอบ:
+1. ทั้ง 4 ไฟล์รันผ่านครบโดยไม่เกิด error
+2. verification ผ่าน:
+   - schema `co_desk` ถูกสร้างสำเร็จ
+   - tables ถูกสร้าง 8 ตาราง
+   - views ถูกสร้าง 6 views (>= 5)
+   - functions ถูกสร้าง 6 functions
+   - seed data สำเร็จ (`roles=3`, `departments=3`, `department_capacity_policies=3`, `holidays=3`)
+3. มีการทดสอบเรียกใช้งาน view/function แบบ smoke test และคืนผลได้ตามคาด
+
+หมายเหตุ:
+- ใน environment นี้ Docker daemon ไม่พร้อมใช้งาน จึงใช้ PostgreSQL local instance แทนสำหรับ dry-run
+- placeholder business logic ใน RPC ยังคงเป็น design intent (compile/run ได้ แต่ยังไม่ใช่ transactional implementation เต็ม)
+
+## 23) Future Implementation Plan (Admin User Provisioning)
+สถานะปัจจุบันของฟีเจอร์นี้: **ออกแบบไว้ในบทที่ 1-3 แล้ว แต่ยังไม่ implement code**
+
+แผนงาน phase ถัดไป:
+1. สร้าง backend endpoint สำหรับ admin provisioning ใน .NET API
+2. ตรวจสิทธิ์ caller ว่าเป็น `admin` ก่อนเรียก Supabase Admin API
+3. เรียก Supabase Admin API เพื่อสร้าง user ใน `auth.users`
+4. ทำ profile sync ใน `co_desk.profiles` พร้อม role/department/status แบบ transactional
+5. เพิ่ม validation ครบ (email duplicate, role valid, department exists, status valid)
+6. เพิ่ม audit log สำหรับการจัดการผู้ใช้โดย admin
+7. ทดสอบ security regression เพื่อยืนยันว่า service role key ไม่ถูกใช้จาก frontend

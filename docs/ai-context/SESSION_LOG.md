@@ -149,3 +149,49 @@
 - อัปเดต `HANDOFF.md` ตามโครง 9 ส่วนที่ใช้ส่งต่อข้ามเครื่อง
 - สร้าง `OPEN_TASKS.md` และจัดลำดับงานคงค้างเป็น High/Medium/Low
 - เตรียมปิด session โดยสรุปไฟล์ที่เปลี่ยนและสถานะ README update
+
+## Session: 2026-02-22 (Asia/Bangkok)
+
+### [00:00:16 +07] เริ่มงานตรวจ SQL run-ready สำหรับ Supabase/PostgreSQL
+- ตรวจไฟล์เป้าหมาย 4 ไฟล์: `01_create_schema_and_tables.sql`, `03_create_reporting_views.sql`, `04_create_rpc_placeholders.sql`, `05_seed_demo_minimal.sql`
+- ยืนยันแนวทางตรวจ 3 ชั้น: static review + dry-run execute + post-run verification queries
+
+### [00:01:44 +07] ตรวจ environment สำหรับ dry-run execution
+- พบว่าไม่มี `psql/postgres` ติดตั้ง และ Docker daemon ไม่พร้อมใช้งานในเครื่อง
+- ตัดสินใจติดตั้ง PostgreSQL local ผ่าน Homebrew เพื่อให้รัน execute test จริงตามข้อบังคับ
+
+### [00:09:58 +07] ดำเนินการทดสอบ execute ตามลำดับไฟล์สำเร็จ
+- รันไฟล์ `01 -> 03 -> 04 -> 05` ด้วย `psql -v ON_ERROR_STOP=1` บน PostgreSQL 14.21 ผ่านครบโดยไม่ error
+- ทดสอบ rerun รอบที่สองบน DB เดิมเพื่อเช็ก idempotency เท่าที่ออกแบบไว้ และผ่านครบ (มีเพียง NOTICE ของ object ที่มีอยู่แล้ว)
+
+### [00:10:52 +07] Verification หลังรัน
+- ยืนยัน schema `co_desk` ถูกสร้างสำเร็จ
+- ยืนยัน objects: 8 tables, 6 views, 6 functions
+- ยืนยัน seed สำเร็จ (`roles=3`, `departments=3`, `department_capacity_policies=3`, `holidays=3`)
+- ทดสอบ view/function smoke test ผ่านทุกตัว
+
+### [00:12:03 +07] อัปเดตเอกสารหลังตรวจ SQL
+- อัปเดต `README.md` เพิ่มส่วน SQL Runtime Validation Status พร้อมผลทดสอบจริง
+- อัปเดต `MASTER_CONTEXT.md`, `HANDOFF.md`, `PROMPT_HISTORY.md`, `SESSION_LOG.md` ให้สะท้อนสถานะ run-ready ล่าสุด
+- ไม่พบ syntax/runtime error ที่ต้องแก้ในไฟล์ SQL รอบนี้
+
+### [00:24:41 +07] เริ่มงานอัปเดตเอกสารจาก requirement เพิ่มเติมเรื่อง Admin Provisioning
+- อ่าน source files และ chapter drafts ครบตามรายการบังคับ
+- ยืนยันว่า `skills.sh` ไม่พบใน repo และคงใช้ best practices จาก `.agents/skills/*` ตาม baseline เดิม
+
+### [00:30:12 +07] ปรับ requirement source และ structured analysis
+- เพิ่ม raw requirement แบบ verbatim ลง `docs/ai-context/REQUIREMENTS_SOURCE.md`
+- เพิ่ม requirement IDs ใหม่ใน `docs/short-paper/requirements-for-paper.md` สำหรับ provisioning/security/validation/audit (`UR-05..UR-07`, `SEC-02..SEC-03`, `VAL-01..VAL-04`, `AUD-01`)
+- ปรับ traceability และจำนวน requirement รวมเป็น 66 ข้อ/ข้อย่อย
+
+### [00:34:27 +07] ปรับบทที่ 1-3 และ ERD design notes
+- อัปเดต `ch01-introduction-draft.md` ให้ขอบเขต role/admin ครอบคลุมการสร้างผู้ใช้ผ่านเว็บภายใต้ backend secure flow
+- อัปเดต `ch02-related-theory-draft.md` เพิ่มหัวข้อ secure administrative user provisioning และหลัก least privilege/secret management
+- อัปเดต `ch03-methodology-draft.md` เพิ่ม flow `Admin UI -> Backend -> Supabase Auth Admin -> Profile Sync`, validation rules, security considerations และ audit design intent
+- อัปเดต `erd-design-notes.md` ด้วย proposed entity/log สำหรับ user management audit และ gap analysis ที่เกี่ยวข้อง
+
+### [00:35:58 +07] อัปเดต context/handoff/README รอบล่าสุด
+- เพิ่ม decisions ใหม่ `DEC-09..DEC-12` ใน `docs/ai-context/DECISIONS.md`
+- อัปเดต `README.md` ในส่วน Feature Scope/Auth Management Design/Security Notes/Known Limitations
+- อัปเดต `HANDOFF.md` และ `PROMPT_HISTORY.md` ให้เครื่องถัดไปทำงานต่อได้ทันที
+- ยืนยันว่ารอบนี้เป็นเอกสารเชิงออกแบบเท่านั้น และยังไม่ได้เขียน implementation code
