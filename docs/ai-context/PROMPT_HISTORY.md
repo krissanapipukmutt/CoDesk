@@ -166,3 +166,20 @@
 - ปรับบทที่ 3 เพิ่ม flow `Admin UI -> Backend -> Supabase Auth Admin -> Profile Sync`, validation rules, security constraints, และ audit design intent
 - ปรับ ERD design notes ให้รองรับ governance entity/log แบบ proposed (ยังไม่สร้าง SQL ใน phase นี้)
 - อัปเดต DECISIONS, SESSION_LOG, HANDOFF, README ให้พร้อม handoff ข้ามเครื่อง และยืนยันว่าไม่ได้เขียน implementation code
+
+### Prompt O (ล่าสุด)
+ผู้ใช้สั่ง Review การออกแบบฐานข้อมูลอีกรอบ โดยโฟกัสให้ `docs/short-paper/erd-design-notes.md` ถูกต้องครบถ้วนและพร้อมนำไปวาด ER Diagram ต่อเอง โดยกำหนดให้:
+1. ตรวจความสอดคล้องกับ requirements และ SQL จริง
+2. ตรวจ entities/attributes/relationships/cardinality/keys และ business rules สำคัญ
+3. อัปเดต `erd-design-notes.md` ให้เป็น ERD-ready
+4. สร้าง `docs/short-paper/erd-finalization-notes.md`
+5. อัปเดต `SESSION_LOG.md`, `HANDOFF.md`, `PROMPT_HISTORY.md`, และ `DECISIONS.md` (ถ้ามี)
+6. อัปเดต `README.md` เฉพาะกรณีที่มีการเปลี่ยน DB design summary จริง
+7. ห้ามเขียน implementation code ใหม่
+
+### Response Strategy สำหรับ Prompt O
+- ใช้แนวทางจาก skills: `database-schema-designer`, `postgresql-table-design`, `supabase-postgres-best-practices`
+- ทำ review เทียบ requirement-to-DDL โดยยึด `database/sql/01_create_schema_and_tables.sql` เป็น physical source of truth
+- ปรับ `erd-design-notes.md` ให้ชัดเจนใน 3 ชั้น: physical baseline, conceptual relation, future proposal
+- สร้าง `erd-finalization-notes.md` เป็น checklist สำหรับผู้วาด ERD เพื่อลดความกำกวมในการวาดภาพ
+- อัปเดต context docs ให้พร้อม handoff ข้ามเครื่อง และบันทึกเหตุผลที่ไม่แก้ README หากไม่มีการเปลี่ยน schema จริง

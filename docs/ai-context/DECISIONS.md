@@ -63,3 +63,8 @@
 - Context: Requirement ระบุว่าควรมี audit log สำหรับการจัดการผู้ใช้โดย admin
 - Decision: เพิ่ม design note ของตาราง `co_desk.user_admin_audit_logs` ในเอกสาร ERD (ยังไม่สร้าง SQL ใน phase นี้)
 - Reason: เฟสปัจจุบันจำกัดที่เอกสาร/ออกแบบ แต่ต้องล็อกโครงสร้างสำหรับ governance และ traceability ใน phase ถัดไป
+
+### DEC-13: ERD Baseline Scope for Review Round
+- Context: งานรอบนี้ต้องทำ Database Design Review เพื่อให้ `erd-design-notes.md` พร้อมวาด ERD ทันที โดยไม่เปลี่ยน implementation/DDL
+- Decision: ยึด physical ERD baseline ตามตารางที่มีอยู่จริงใน `database/sql/01_create_schema_and_tables.sql` จำนวน 8 ตาราง และแยก `co_desk.user_admin_audit_logs` เป็น proposed entity ของ phase ถัดไป
+- Reason: ช่วยให้ภาพ ERD ตรงกับ SQL ปัจจุบันและไม่สร้างความสับสนระหว่างสิ่งที่ implement แล้วกับสิ่งที่วางแผนไว้

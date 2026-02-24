@@ -195,3 +195,24 @@
 - อัปเดต `README.md` ในส่วน Feature Scope/Auth Management Design/Security Notes/Known Limitations
 - อัปเดต `HANDOFF.md` และ `PROMPT_HISTORY.md` ให้เครื่องถัดไปทำงานต่อได้ทันที
 - ยืนยันว่ารอบนี้เป็นเอกสารเชิงออกแบบเท่านั้น และยังไม่ได้เขียน implementation code
+
+### [13:35:22 +07] เริ่มงาน Database Design Review รอบ ERD-ready
+- อ่านเอกสารบังคับครบ: requirements source, structured analysis, chapter 3, ddl/reporting summaries, ERD notes เดิม, SQL `01/03/04/05`, และ README
+- ยืนยันว่าโฟกัสรอบนี้เป็น design/documentation review เท่านั้น ไม่เขียน implementation code ใหม่
+
+### [13:37:28 +07] ตรวจ consistency ระหว่าง ERD notes กับ DDL SQL
+- ตรวจ entity/attribute/PK/FK/cardinality เทียบกับ `database/sql/01_create_schema_and_tables.sql` และยืนยัน physical baseline = 8 ตาราง
+- ตรวจ business rule mapping ที่ต้องไม่ตกหล่น: booking conflict, capacity limited/unlimited, holiday warning, RBAC (`employee/hr/admin`), reporting views, date format `YYYY-MM-DD`, timezone `Asia/Bangkok`, admin provisioning design
+
+### [13:39:10 +07] ปรับ `erd-design-notes.md` ให้เป็น ERD-ready ฉบับใช้งานจริง
+- ปรับโครงเอกสารให้แยกชัดเจน: physical entities vs proposed/external entities
+- ยืนยัน relationships + cardinality ครบทุก FK ที่อยู่ใน SQL ปัจจุบัน
+- เพิ่มส่วน reporting-critical fields, drawing conventions, assumptions/limitations และ gap analysis สำหรับ phase implementation
+
+### [13:40:02 +07] สร้าง `erd-finalization-notes.md` สำหรับขั้นตอนวาด ERD
+- สร้าง checklist แบบสั้นที่ใช้วาด ERD ได้ทันที: entities, PK/FK, relationships/cardinality, key attributes, notes ใต้ภาพ, และสิ่งที่ไม่ต้องวาด
+
+### [13:40:40 +07] อัปเดต context docs และ decision รอบนี้
+- อัปเดต `PROMPT_HISTORY.md` และ `HANDOFF.md` ให้สะท้อนงานรีวิว ERD รอบล่าสุด
+- เพิ่ม `DEC-13` ใน `DECISIONS.md` เพื่อยืนยันขอบเขต ERD baseline รอบรีวิวนี้
+- รอบนี้ไม่อัปเดต `README.md` เพราะไม่มีการเปลี่ยน schema/DDL/view/function จริง มีเฉพาะการทำให้เอกสาร ERD ชัดเจนขึ้น

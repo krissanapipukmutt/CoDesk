@@ -128,3 +128,23 @@ psql -h 127.0.0.1 -p 55433 -d codesk_validate -v ON_ERROR_STOP=1 -f database/sql
 psql -h 127.0.0.1 -p 55433 -d codesk_validate -v ON_ERROR_STOP=1 -f database/sql/04_create_rpc_placeholders.sql
 psql -h 127.0.0.1 -p 55433 -d codesk_validate -v ON_ERROR_STOP=1 -f database/sql/05_seed_demo_minimal.sql
 ```
+
+## 10) Update ล่าสุด: Database Design Review (2026-02-22)
+### 10.1 ผลลัพธ์รอบนี้
+1. รีวิวและปรับ `docs/short-paper/erd-design-notes.md` ให้เป็น ERD-ready โดยเทียบกับ requirements + SQL จริง
+2. สร้าง `docs/short-paper/erd-finalization-notes.md` เพื่อใช้เป็นคู่มือวาด ERD แบบลงมือได้ทันที
+3. อัปเดต context files (`SESSION_LOG`, `PROMPT_HISTORY`, `DECISIONS`) สำหรับการทำงานต่อข้ามเครื่อง
+
+### 10.2 สถานะความสอดคล้อง
+1. Physical baseline ที่ยืนยัน: 8 ตารางใน `co_desk`
+2. Relationships/FK/cardinality ถูกสรุปครบทุกจุดตาม DDL ปัจจุบัน
+3. Business rules design notes ครอบคลุม conflict, capacity, holiday warning, RBAC, reporting support, date/time standards, และ admin provisioning design intent
+
+### 10.3 README ในรอบนี้
+- README updated: **No**
+- เหตุผล: รอบนี้ไม่มีการเปลี่ยน schema/DDL/views/functions หรือ DB design summary เชิงโครงสร้าง มีเฉพาะการปรับความชัดเจนของเอกสาร ERD และเพิ่ม checklist สำหรับการวาดภาพ
+
+### 10.4 สิ่งที่ต้องทำต่อ (ลำดับถัดไป)
+1. วาดภาพ ERD จาก `docs/short-paper/erd-finalization-notes.md`
+2. ใส่รูป ERD และ process diagrams ในบทที่ 3
+3. ปิดงานภาษาเชิงวิชาการและ references ก่อนส่งอาจารย์

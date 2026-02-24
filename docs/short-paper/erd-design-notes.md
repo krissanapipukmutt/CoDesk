@@ -1,320 +1,314 @@
-# ERD Design Notes (ERD-Ready Specification) - `co_desk`
+# ERD Design Notes (ERD-Ready) สำหรับ Schema `co_desk`
 
-## 1) ขอบเขตเอกสารและหลักการตั้งชื่อ
-เอกสารฉบับนี้เป็นสเปกเชิงโครงสร้างข้อมูลสำหรับวาด ERD ของระบบ `co_desk` โดยตรง และสามารถส่งต่อให้ผู้ออกแบบ/AI ตัวอื่นใช้งานต่อได้โดยไม่ต้องอ้างอิงประวัติแชต
+## 1) ขอบเขตการรีวิวและผลสรุป
+เอกสารฉบับนี้เป็นผลทบทวนการออกแบบฐานข้อมูลของโครงการ CoDesk โดยเทียบกับแหล่งอ้างอิงหลัก ได้แก่ `docs/ai-context/REQUIREMENTS_SOURCE.md`, `docs/short-paper/requirements-for-paper.md`, `docs/short-paper/ch03-methodology-draft.md`, และ SQL ปัจจุบัน (`database/sql/01_create_schema_and_tables.sql`, `database/sql/03_create_reporting_views.sql`, `database/sql/04_create_rpc_placeholders.sql`, `database/sql/05_seed_demo_minimal.sql`) เพื่อให้พร้อมนำไปวาด ER Diagram ได้ทันที
 
-หลักการตั้งชื่อ (Naming Conventions):
-1. ใช้ schema เดียว: `co_desk`
-2. ชื่อตาราง/คอลัมน์ใช้ `snake_case`
-3. คีย์หลักลงท้าย `_id`
-4. คีย์ต่างประเทศใช้ชื่อเดียวกับคีย์ที่อ้างอิง เช่น `department_id`, `role_id`
-5. ชื่อ view ใช้ prefix `vw_`
-6. ฟิลด์วันเวลาใช้ `timestamptz` หรือ `date` ตามเจตนาเชิงธุรกิจ
+ผลรีวิว: **ผ่านแต่ควรแก้เล็กน้อย และได้ปรับแก้แล้วในเอกสารนี้** โดยยึด SQL ปัจจุบันเป็น physical baseline และแยกส่วนที่เป็น proposed design สำหรับ phase ถัดไปอย่างชัดเจน
 
-มาตรฐานเวลา/วันที่:
-- UI และเอกสารแสดงวันที่รูปแบบ `YYYY-MM-DD`
-- timezone มาตรฐานระบบ: `Asia/Bangkok`
-- ในฐานข้อมูลเก็บเวลาเป็น `timestamptz` และเก็บวันที่สำหรับ reporting/calendar เป็น `date`
+ประเด็นที่ปรับให้ชัดเจนในรอบนี้:
+1. แยก entity ที่มีอยู่จริงใน SQL ออกจาก entity ที่เป็น proposal
+2. ยืนยัน FK/relationship/cardinality ให้ตรงกับ DDL ทุกจุด
+3. เพิ่มขอบเขตว่าอะไรควรใส่ในภาพ ERD และอะไรควรเก็บไว้ใน notes
+4. เพิ่มสรุป assumptions/limitations สำหรับใช้เป็นหมายเหตุใต้ภาพ
 
-## 2) Entity Catalog (อย่างน้อย 6 entities)
+## 2) Conventions สำหรับการวาด ERD
+1. ใช้ schema หลัก: `co_desk`
+2. ชื่อตารางและคอลัมน์ใช้ `snake_case`
+3. Primary key ลงท้ายด้วย `_id`
+4. วันที่เก็บเป็น `date`, เวลาเก็บเป็น `timestamptz`
+5. มาตรฐานการแสดงผลระดับธุรกิจ: `YYYY-MM-DD` และ timezone `Asia/Bangkok`
+6. หากแสดงระบบภายนอก (`auth.users`) ให้ใช้กรอบเส้นประ (external boundary)
 
-### 2.1 Entity: `co_desk.roles`
-วัตถุประสงค์: เก็บนิยามบทบาท RBAC หลักของระบบ (`employee`, `hr`, `admin`)
+## 3) Entity Catalog (Physical Baseline จาก SQL ปัจจุบัน)
 
-| Attribute | Logical Data Type | หมายเหตุ |
+### 3.1 `co_desk.roles`
+วัตถุประสงค์: เก็บบทบาทหลักของ RBAC (`employee`, `hr`, `admin`)
+
+| Attribute | Logical Type | Key/Constraint |
 |---|---|---|
-| `role_id` | bigint (identity) | Primary Key |
-| `role_code` | enum(`role_code`) | ค่าคงที่ `employee/hr/admin` |
-| `role_name` | text | ชื่อบทบาทที่อ่านง่าย |
-| `role_description` | text | คำอธิบายบทบาท |
-| `can_manage_users` | boolean | สิทธิ์จัดการผู้ใช้ |
-| `can_manage_departments` | boolean | สิทธิ์จัดการฝ่าย |
-| `can_view_reports` | boolean | สิทธิ์เข้าถึงรายงาน |
-| `is_system_role` | boolean | ระบุบทบาทระบบ |
-| `created_at` | timestamptz | เวลาสร้าง |
-| `updated_at` | timestamptz | เวลาแก้ไขล่าสุด |
+| `role_id` | bigint (identity) | PK |
+| `role_code` | `co_desk.role_code` (enum) | UNIQUE, NOT NULL |
+| `role_name` | text | UNIQUE, NOT NULL |
+| `role_description` | text | nullable |
+| `can_manage_users` | boolean | NOT NULL |
+| `can_manage_departments` | boolean | NOT NULL |
+| `can_view_reports` | boolean | NOT NULL |
+| `is_system_role` | boolean | NOT NULL |
+| `created_at` | timestamptz | NOT NULL |
+| `updated_at` | timestamptz | NOT NULL |
 
-Primary Key: `role_id`  
-Foreign Keys: ไม่มี
+PK: `role_id`  
+FK: ไม่มี
 
-### 2.2 Entity: `co_desk.departments`
+### 3.2 `co_desk.departments`
 วัตถุประสงค์: เก็บข้อมูลฝ่ายงานและนโยบายความจุพื้นฐานระดับฝ่าย
 
-| Attribute | Logical Data Type | หมายเหตุ |
+| Attribute | Logical Type | Key/Constraint |
 |---|---|---|
-| `department_id` | bigint (identity) | Primary Key |
-| `department_code` | text | รหัสฝ่าย (unique) |
-| `department_name` | text | ชื่อฝ่าย |
-| `capacity_mode` | enum(`capacity_mode`) | `limited`/`unlimited` |
-| `default_capacity_per_day` | integer | ความจุพื้นฐานต่อวัน |
-| `is_active` | boolean | สถานะใช้งานฝ่าย |
-| `effective_timezone` | text | บังคับ `Asia/Bangkok` |
-| `created_by_profile_id` | uuid | ผู้สร้างข้อมูลฝ่าย |
-| `created_at` | timestamptz | เวลาสร้าง |
-| `updated_at` | timestamptz | เวลาแก้ไขล่าสุด |
+| `department_id` | bigint (identity) | PK |
+| `department_code` | text | UNIQUE, NOT NULL |
+| `department_name` | text | NOT NULL |
+| `capacity_mode` | `co_desk.capacity_mode` (enum) | NOT NULL |
+| `default_capacity_per_day` | integer | CHECK, NOT NULL |
+| `is_active` | boolean | NOT NULL |
+| `effective_timezone` | text | CHECK (`Asia/Bangkok`), NOT NULL |
+| `created_by_profile_id` | uuid | FK, nullable |
+| `created_at` | timestamptz | NOT NULL |
+| `updated_at` | timestamptz | NOT NULL |
 
-Primary Key: `department_id`  
-Foreign Keys: `created_by_profile_id -> co_desk.profiles.profile_id` (nullable)
+PK: `department_id`  
+FK: `created_by_profile_id -> co_desk.profiles.profile_id` (`ON DELETE SET NULL`)
 
-### 2.3 Entity: `co_desk.profiles`
-วัตถุประสงค์: เก็บโปรไฟล์ผู้ใช้ในระบบที่เชื่อมกับ Supabase Auth
+### 3.3 `co_desk.profiles`
+วัตถุประสงค์: เก็บโปรไฟล์ผู้ใช้เชิงธุรกิจเพื่อเชื่อม Supabase Auth กับข้อมูลระบบ
 
-| Attribute | Logical Data Type | หมายเหตุ |
+| Attribute | Logical Type | Key/Constraint |
 |---|---|---|
-| `profile_id` | uuid | Primary Key, map กับ `auth.users.id` |
-| `employee_code` | text | รหัสพนักงาน (unique) |
-| `full_name` | text | ชื่อพนักงาน |
-| `email` | text | อีเมลสำหรับติดต่อ/ระบบ |
-| `department_id` | bigint | ฝ่ายที่สังกัด |
-| `role_id` | bigint | บทบาท RBAC |
-| `is_active` | boolean | สถานะการใช้งาน |
-| `timezone_name` | text | บังคับ `Asia/Bangkok` |
-| `created_at` | timestamptz | เวลาสร้าง |
-| `updated_at` | timestamptz | เวลาแก้ไขล่าสุด |
+| `profile_id` | uuid | PK |
+| `employee_code` | text | UNIQUE, NOT NULL |
+| `full_name` | text | NOT NULL |
+| `email` | text | NOT NULL, unique index on `lower(email)` |
+| `department_id` | bigint | FK, NOT NULL |
+| `role_id` | bigint | FK, NOT NULL |
+| `is_active` | boolean | NOT NULL |
+| `timezone_name` | text | CHECK (`Asia/Bangkok`), NOT NULL |
+| `created_at` | timestamptz | NOT NULL |
+| `updated_at` | timestamptz | NOT NULL |
 
-Primary Key: `profile_id`  
-Foreign Keys:
+PK: `profile_id`  
+FK:
 - `department_id -> co_desk.departments.department_id`
 - `role_id -> co_desk.roles.role_id`
-- (implementation target) `profile_id -> auth.users.id`
+- Optional runtime FK: `profile_id -> auth.users.id` (สร้างเมื่อ schema `auth` มีอยู่)
 
-### 2.4 Entity: `co_desk.department_capacity_policies`
-วัตถุประสงค์: เก็บนโยบายความจุแบบมีผลตามช่วงเวลา (policy history)
+### 3.4 `co_desk.department_capacity_policies`
+วัตถุประสงค์: เก็บนโยบายความจุแบบมีช่วงวันที่มีผล (รองรับประวัตินโยบาย)
 
-| Attribute | Logical Data Type | หมายเหตุ |
+| Attribute | Logical Type | Key/Constraint |
 |---|---|---|
-| `policy_id` | bigint (identity) | Primary Key |
-| `department_id` | bigint | ฝ่ายที่นโยบายนี้ใช้บังคับ |
-| `effective_start_date` | date | วันเริ่มใช้ |
-| `effective_end_date` | date | วันสิ้นสุด (nullable) |
-| `capacity_mode` | enum(`capacity_mode`) | `limited`/`unlimited` |
-| `capacity_per_day` | integer | ต้องมีเมื่อ `limited` |
-| `note_text` | text | คำอธิบายนโยบาย |
-| `is_active` | boolean | สถานะนโยบาย |
-| `created_by_profile_id` | uuid | ผู้สร้างนโยบาย |
-| `created_at` | timestamptz | เวลาสร้าง |
-| `updated_at` | timestamptz | เวลาแก้ไขล่าสุด |
+| `policy_id` | bigint (identity) | PK |
+| `department_id` | bigint | FK, NOT NULL |
+| `effective_start_date` | date | NOT NULL |
+| `effective_end_date` | date | nullable |
+| `capacity_mode` | `co_desk.capacity_mode` (enum) | NOT NULL |
+| `capacity_per_day` | integer | conditional check |
+| `note_text` | text | nullable |
+| `is_active` | boolean | NOT NULL |
+| `created_by_profile_id` | uuid | FK, nullable |
+| `created_at` | timestamptz | NOT NULL |
+| `updated_at` | timestamptz | NOT NULL |
 | `effective_date_range` | daterange (generated) | ใช้กับ exclusion constraint |
 
-Primary Key: `policy_id`  
-Foreign Keys:
-- `department_id -> co_desk.departments.department_id`
-- `created_by_profile_id -> co_desk.profiles.profile_id` (nullable)
+PK: `policy_id`  
+FK:
+- `department_id -> co_desk.departments.department_id` (`ON DELETE CASCADE`)
+- `created_by_profile_id -> co_desk.profiles.profile_id` (`ON DELETE SET NULL`)
 
-### 2.5 Entity: `co_desk.holidays`
-วัตถุประสงค์: เก็บวันหยุดเพื่อใช้เตือนและยืนยันก่อนบันทึกการจอง
+### 3.5 `co_desk.holidays`
+วัตถุประสงค์: เก็บวันหยุดเพื่อรองรับเงื่อนไข warning/confirmation ขณะจอง
 
-| Attribute | Logical Data Type | หมายเหตุ |
+| Attribute | Logical Type | Key/Constraint |
 |---|---|---|
-| `holiday_id` | bigint (identity) | Primary Key |
-| `holiday_date` | date | วันหยุด (unique) |
-| `holiday_name` | text | ชื่อวันหยุด |
-| `holiday_description` | text | รายละเอียด |
-| `is_active` | boolean | เปิด/ปิดใช้งาน |
-| `created_by_profile_id` | uuid | ผู้สร้างข้อมูลวันหยุด |
-| `created_at` | timestamptz | เวลาสร้าง |
-| `updated_at` | timestamptz | เวลาแก้ไขล่าสุด |
+| `holiday_id` | bigint (identity) | PK |
+| `holiday_date` | date | UNIQUE, NOT NULL |
+| `holiday_name` | text | NOT NULL |
+| `holiday_description` | text | nullable |
+| `is_active` | boolean | NOT NULL |
+| `created_by_profile_id` | uuid | FK, nullable |
+| `created_at` | timestamptz | NOT NULL |
+| `updated_at` | timestamptz | NOT NULL |
 
-Primary Key: `holiday_id`  
-Foreign Keys: `created_by_profile_id -> co_desk.profiles.profile_id` (nullable)
+PK: `holiday_id`  
+FK: `created_by_profile_id -> co_desk.profiles.profile_id` (`ON DELETE SET NULL`)
 
-### 2.6 Entity: `co_desk.bookings`
-วัตถุประสงค์: ธุรกรรมการจองหลักของระบบ รองรับทั้งรายวันและช่วงเวลา
+### 3.6 `co_desk.bookings`
+วัตถุประสงค์: เก็บธุรกรรมการจองที่นั่ง (ทั้งรายวันและช่วงเวลา)
 
-| Attribute | Logical Data Type | หมายเหตุ |
+| Attribute | Logical Type | Key/Constraint |
 |---|---|---|
-| `booking_id` | bigint (identity) | Primary Key |
-| `booked_for_profile_id` | uuid | ผู้ถูกจอง (target user) |
-| `booked_by_profile_id` | uuid | ผู้ทำรายการ |
-| `department_id` | bigint | ฝ่ายของรายการจอง |
-| `booking_mode` | enum(`booking_mode`) | `single_day`/`time_range` |
-| `booking_date_start` | date | วันที่เริ่ม (สำหรับ UI/report) |
-| `booking_date_end` | date | วันที่สิ้นสุด (สำหรับ UI/report) |
-| `start_at` | timestamptz | เวลาเริ่มจริง |
-| `end_at` | timestamptz | เวลาสิ้นสุดจริง |
-| `booking_period` | tstzrange (generated) | ใช้ตรวจ overlap |
-| `holiday_warning_acknowledged` | boolean | ยืนยัน warning วันหยุดแล้วหรือไม่ |
-| `status_code` | enum(`booking_status`) | `booked`/`cancelled` |
-| `note_text` | text | หมายเหตุ |
-| `cancelled_at` | timestamptz | เวลายกเลิก |
-| `cancelled_by_profile_id` | uuid | ผู้ยกเลิก |
-| `created_at` | timestamptz | เวลาสร้าง |
-| `updated_at` | timestamptz | เวลาแก้ไขล่าสุด |
+| `booking_id` | bigint (identity) | PK |
+| `booked_for_profile_id` | uuid | FK, NOT NULL |
+| `booked_by_profile_id` | uuid | FK, NOT NULL |
+| `department_id` | bigint | FK, NOT NULL |
+| `booking_mode` | `co_desk.booking_mode` (enum) | NOT NULL |
+| `booking_date_start` | date | NOT NULL |
+| `booking_date_end` | date | NOT NULL |
+| `start_at` | timestamptz | NOT NULL |
+| `end_at` | timestamptz | NOT NULL |
+| `booking_period` | tstzrange (generated) | ใช้กับ exclusion constraint |
+| `holiday_warning_acknowledged` | boolean | NOT NULL |
+| `status_code` | `co_desk.booking_status` (enum) | NOT NULL |
+| `note_text` | text | nullable |
+| `cancelled_at` | timestamptz | nullable |
+| `cancelled_by_profile_id` | uuid | FK, nullable |
+| `created_at` | timestamptz | NOT NULL |
+| `updated_at` | timestamptz | NOT NULL |
 
-Primary Key: `booking_id`  
-Foreign Keys:
+PK: `booking_id`  
+FK:
 - `booked_for_profile_id -> co_desk.profiles.profile_id`
 - `booked_by_profile_id -> co_desk.profiles.profile_id`
 - `department_id -> co_desk.departments.department_id`
-- `cancelled_by_profile_id -> co_desk.profiles.profile_id` (nullable)
+- `cancelled_by_profile_id -> co_desk.profiles.profile_id`
 
-### 2.7 Entity: `co_desk.booking_audit_logs`
-วัตถุประสงค์: บันทึกประวัติการ create/update/cancel สำหรับตรวจสอบย้อนหลัง
+### 3.7 `co_desk.booking_audit_logs`
+วัตถุประสงค์: บันทึกเหตุการณ์ create/update/cancel ของการจองเพื่อการตรวจสอบย้อนหลัง
 
-| Attribute | Logical Data Type | หมายเหตุ |
+| Attribute | Logical Type | Key/Constraint |
 |---|---|---|
-| `audit_log_id` | bigint (identity) | Primary Key |
-| `booking_id` | bigint | รายการจองที่เกี่ยวข้อง |
-| `action_code` | enum(`audit_action`) | `create/update/cancel` |
-| `actor_profile_id` | uuid | ผู้ทำรายการ |
-| `actor_role_code` | enum(`role_code`) | role ณ ขณะทำรายการ |
-| `action_reason` | text | เหตุผล |
-| `old_values_json` | jsonb | ข้อมูลก่อนแก้ไข |
-| `new_values_json` | jsonb | ข้อมูลหลังแก้ไข |
-| `action_at` | timestamptz | เวลาเกิดเหตุการณ์ |
-| `request_id` | uuid | correlation id |
-| `ip_address` | inet | client ip |
-| `user_agent` | text | client agent |
+| `audit_log_id` | bigint (identity) | PK |
+| `booking_id` | bigint | FK, NOT NULL |
+| `action_code` | `co_desk.audit_action` (enum) | NOT NULL |
+| `actor_profile_id` | uuid | FK, NOT NULL |
+| `actor_role_code` | `co_desk.role_code` (enum) | NOT NULL |
+| `action_reason` | text | nullable |
+| `old_values_json` | jsonb | NOT NULL |
+| `new_values_json` | jsonb | NOT NULL |
+| `action_at` | timestamptz | NOT NULL |
+| `request_id` | uuid | nullable |
+| `ip_address` | inet | nullable |
+| `user_agent` | text | nullable |
 
-Primary Key: `audit_log_id`  
-Foreign Keys:
-- `booking_id -> co_desk.bookings.booking_id`
+PK: `audit_log_id`  
+FK:
+- `booking_id -> co_desk.bookings.booking_id` (`ON DELETE CASCADE`)
 - `actor_profile_id -> co_desk.profiles.profile_id`
 
-### 2.8 Entity (Optional): `co_desk.user_department_history`
-วัตถุประสงค์: รองรับการเก็บประวัติย้ายฝ่ายเพื่อรายงานย้อนหลังในอนาคต
+### 3.8 `co_desk.user_department_history`
+วัตถุประสงค์: เก็บประวัติการย้ายฝ่ายของผู้ใช้ (สนับสนุนรายงานย้อนหลัง)
 
-| Attribute | Logical Data Type | หมายเหตุ |
+| Attribute | Logical Type | Key/Constraint |
 |---|---|---|
-| `history_id` | bigint (identity) | Primary Key |
-| `profile_id` | uuid | พนักงาน |
-| `department_id` | bigint | ฝ่ายที่ถูก assign |
-| `assigned_start_date` | date | วันเริ่ม |
-| `assigned_end_date` | date | วันสิ้นสุด (nullable) |
-| `assigned_by_profile_id` | uuid | ผู้แก้ไข |
-| `note_text` | text | หมายเหตุ |
-| `created_at` | timestamptz | เวลาสร้าง |
-| `updated_at` | timestamptz | เวลาแก้ไขล่าสุด |
+| `history_id` | bigint (identity) | PK |
+| `profile_id` | uuid | FK, NOT NULL |
+| `department_id` | bigint | FK, NOT NULL |
+| `assigned_start_date` | date | NOT NULL |
+| `assigned_end_date` | date | nullable |
+| `assigned_by_profile_id` | uuid | FK, nullable |
+| `note_text` | text | nullable |
+| `created_at` | timestamptz | NOT NULL |
+| `updated_at` | timestamptz | NOT NULL |
 
-Primary Key: `history_id`  
-Foreign Keys:
-- `profile_id -> co_desk.profiles.profile_id`
+PK: `history_id`  
+FK:
+- `profile_id -> co_desk.profiles.profile_id` (`ON DELETE CASCADE`)
 - `department_id -> co_desk.departments.department_id`
-- `assigned_by_profile_id -> co_desk.profiles.profile_id` (nullable)
+- `assigned_by_profile_id -> co_desk.profiles.profile_id`
 
-### 2.9 Entity (Optional - Provisioning Governance): `co_desk.user_admin_audit_logs`
-วัตถุประสงค์: รองรับการบันทึกเหตุการณ์สร้าง/แก้ไขผู้ใช้โดย `admin` สำหรับตรวจสอบย้อนหลัง
+## 4) Proposed/External Entities (ไม่ใช่ Physical Baseline ใน SQL ปัจจุบัน)
 
-| Attribute | Logical Data Type | หมายเหตุ |
-|---|---|---|
-| `user_audit_log_id` | bigint (identity) | Primary Key |
-| `target_auth_user_id` | uuid | user id จาก `auth.users` ที่ถูกจัดการ |
-| `target_profile_id` | uuid | profile เป้าหมาย (nullable ในบางกรณี) |
-| `action_code` | text หรือ enum | เช่น `create_user`, `update_user_role`, `deactivate_user` |
-| `actor_profile_id` | uuid | ผู้ปฏิบัติการ (admin) |
-| `actor_role_code` | enum(`role_code`) | ควรเป็น `admin` |
-| `request_payload_json` | jsonb | ข้อมูลคำขอ (mask fields ที่อ่อนไหว) |
-| `result_payload_json` | jsonb | ผลลัพธ์จาก provisioning flow |
-| `result_status` | text | เช่น `success`, `failed` |
-| `action_reason` | text | เหตุผลการดำเนินการ |
-| `action_at` | timestamptz | เวลาเกิดเหตุการณ์ |
-| `request_id` | uuid | correlation id |
-| `ip_address` | inet | client ip |
-| `user_agent` | text | client agent |
+### 4.1 `co_desk.user_admin_audit_logs` (Proposed)
+วัตถุประสงค์: รองรับ requirement `AUD-01` สำหรับ audit การจัดการผู้ใช้โดย admin (create/update/activate/deactivate)
 
-Primary Key: `user_audit_log_id`  
-Foreign Keys (proposed):
-- `actor_profile_id -> co_desk.profiles.profile_id`
-- `target_profile_id -> co_desk.profiles.profile_id` (nullable)
+สถานะ: ยังไม่อยู่ใน `database/sql/01_create_schema_and_tables.sql` และควรเพิ่มใน phase implementation
 
-## 3) Relationships และ Cardinality
-| Relationship | Cardinality | Optionality |
-|---|---|---|
-| `roles` -> `profiles` | 1 : N | profile ต้องมี role เสมอ |
-| `departments` -> `profiles` | 1 : N | profile ต้องมี department เสมอ |
-| `departments` -> `department_capacity_policies` | 1 : N | policy ต้องมี department |
-| `profiles` -> `bookings` (`booked_for_profile_id`) | 1 : N | booking ต้องมีผู้ถูกจอง |
-| `profiles` -> `bookings` (`booked_by_profile_id`) | 1 : N | booking ต้องมีผู้ทำรายการ |
-| `departments` -> `bookings` | 1 : N | booking ต้องมี department |
-| `profiles` -> `bookings` (`cancelled_by_profile_id`) | 1 : N | optional เมื่อยังไม่ยกเลิก |
-| `bookings` -> `booking_audit_logs` | 1 : N | log ต้องมี booking |
-| `profiles` -> `booking_audit_logs` | 1 : N | log ต้องมี actor |
-| `profiles` -> `user_department_history` | 1 : N | optional table |
-| `departments` -> `user_department_history` | 1 : N | optional table |
-| `profiles` -> `user_admin_audit_logs` (`actor_profile_id`) | 1 : N | optional table (admin governance) |
-| `profiles` -> `user_admin_audit_logs` (`target_profile_id`) | 1 : N | optional table (nullable target) |
+### 4.2 `auth.users` (External)
+วัตถุประสงค์: แหล่ง identity ของ Supabase Auth
 
-หมายเหตุเชิง concept:
-- ความสัมพันธ์ `bookings` กับ `holidays` เป็นความสัมพันธ์เชิงเงื่อนไขจากช่วงวันที่ (ไม่มี FK ตรง) โดยใช้เงื่อนไข `holiday_date between booking_date_start and booking_date_end`
+สถานะใน ERD: แนะนำวาดเป็น external entity พร้อมเส้นเชื่อมเชิงแนวคิด 1:1 กับ `co_desk.profiles`
 
-## 4) Business Rules Mapping (Entity/Relationship)
-| Rule ID | Business Rule | Entity/Relationship ที่เกี่ยวข้อง | วิธี enforce |
+## 5) Relationships และ Cardinality ที่ต้องใส่ใน ERD
+
+### 5.1 Physical FK Relationships (อ้างอิง DDL โดยตรง)
+| From | To | Cardinality | Optionality |
 |---|---|---|---|
-| `BR-01` | User เดิมห้ามจองซ้อนเวลา | `bookings` | `EXCLUDE` บน `booked_for_profile_id + booking_period` |
-| `BR-02` | รองรับ `single_day` และ `time_range` | `bookings` | CHECK (`booking_mode`, `start_at/end_at`, date order) |
-| `BR-03` | Capacity แบบ `limited/unlimited` | `departments`, `department_capacity_policies`, `bookings` | CHECK + RPC capacity check |
-| `BR-04` | จองวันหยุดได้แต่ต้องยืนยัน warning | `holidays`, `bookings` | field `holiday_warning_acknowledged` + RPC holiday check |
-| `BR-05` | RBAC 3 roles (`employee/hr/admin`) | `roles`, `profiles`, `bookings` | role model + RLS/API (phase ถัดไป) |
-| `BR-06` | HR จองให้คนอื่นไม่ได้, Admin จองแทนได้ | `profiles`, `bookings`, `roles` | RPC authorization + RLS (phase ถัดไป) |
-| `BR-07` | รายงานสำหรับ hr/admin | reporting views + `profiles/roles` | view layer + RLS policy (phase ถัดไป) |
-| `BR-08` | Date format `YYYY-MM-DD`, timezone `Asia/Bangkok` | `bookings`, `departments`, `profiles` | date columns + timestamptz + timezone checks |
-| `BR-09` | Admin สร้างผู้ใช้ใน `auth.users` ผ่านหน้าเว็บได้ แต่ต้องผ่าน backend เท่านั้น | `profiles` + Supabase Auth (concept) | backend endpoint + admin authorization |
-| `BR-10` | Provisioning ต้อง validate email/role/department/status ก่อน sync profile | `profiles`, `roles`, `departments` | API validation + DB constraints |
-| `BR-11` | ต้องมี audit log สำหรับการจัดการผู้ใช้โดย admin | `user_admin_audit_logs` (proposed) | transactional write ใน provisioning flow |
+| `profiles.role_id` | `roles.role_id` | N:1 | mandatory |
+| `profiles.department_id` | `departments.department_id` | N:1 | mandatory |
+| `departments.created_by_profile_id` | `profiles.profile_id` | N:1 | optional |
+| `department_capacity_policies.department_id` | `departments.department_id` | N:1 | mandatory |
+| `department_capacity_policies.created_by_profile_id` | `profiles.profile_id` | N:1 | optional |
+| `holidays.created_by_profile_id` | `profiles.profile_id` | N:1 | optional |
+| `bookings.booked_for_profile_id` | `profiles.profile_id` | N:1 | mandatory |
+| `bookings.booked_by_profile_id` | `profiles.profile_id` | N:1 | mandatory |
+| `bookings.department_id` | `departments.department_id` | N:1 | mandatory |
+| `bookings.cancelled_by_profile_id` | `profiles.profile_id` | N:1 | optional |
+| `booking_audit_logs.booking_id` | `bookings.booking_id` | N:1 | mandatory |
+| `booking_audit_logs.actor_profile_id` | `profiles.profile_id` | N:1 | mandatory |
+| `user_department_history.profile_id` | `profiles.profile_id` | N:1 | mandatory |
+| `user_department_history.department_id` | `departments.department_id` | N:1 | mandatory |
+| `user_department_history.assigned_by_profile_id` | `profiles.profile_id` | N:1 | optional |
 
-## 5) Candidate Constraints และ Indexes
+### 5.2 Conceptual Relationships (ไม่ใช่ FK ตรง)
+| Relation | Cardinality | หมายเหตุ |
+|---|---|---|
+| `bookings` ↔ `holidays` | 0..N (ตามช่วงวันที่จอง) | ใช้เงื่อนไข `holiday_date between booking_date_start and booking_date_end` |
+| `auth.users` ↔ `co_desk.profiles` | 1:1 (target model) | มีการสร้าง FK แบบ conditional เมื่อมี `auth.users` |
 
-### 5.1 Candidate Constraints
-1. `roles.role_code` unique
-2. `departments.department_code` unique
-3. `profiles.employee_code` unique
-4. `holidays.holiday_date` unique
-5. `bookings` date/time consistency checks
-6. `bookings_no_overlap_per_user_excl` (GiST exclude)
-7. `department_capacity_policy_no_overlap_excl` (GiST exclude)
-8. capacity mode consistency checks (`limited` vs `unlimited`)
-9. (proposed) `user_admin_audit_logs.action_code` domain/check
-10. (proposed) `user_admin_audit_logs.result_status` domain/check
-
-### 5.2 Candidate Indexes
-1. FK indexes ทุกจุดที่ join บ่อย (`profiles.department_id`, `profiles.role_id`, `bookings.*_profile_id`, `bookings.department_id`)
-2. Calendar/report indexes (`bookings.start_at`, `bookings.booking_date_start`, `bookings.booking_date_end`)
-3. Partial index สำหรับ active bookings (`status_code = 'booked'`)
-4. Audit index (`booking_audit_logs(booking_id, action_at desc)`)
-5. Email lookup index (`lower(profiles.email)`)
-6. (proposed) `user_admin_audit_logs(actor_profile_id, action_at desc)`
-7. (proposed) `user_admin_audit_logs(target_auth_user_id, action_at desc)`
-8. (proposed) `user_admin_audit_logs(request_id)`
-
-## 6) หมายเหตุสำหรับ Supabase PostgreSQL Implementation
-1. ใช้ schema `co_desk` สำหรับ object หลักทั้งหมด
-2. `profiles.profile_id` ออกแบบให้ map กับ `auth.users.id`
-3. แนะนำลำดับ migration: types -> master tables -> dependent tables -> constraints/indexes -> views -> RPC -> RLS
-4. ในรอบ design นี้ RLS ยังเป็น design intent; ให้ implement policy แยกใน phase ถัดไป
-5. กรณี capacity และ holiday confirmation ต้องใช้ transactional RPC/function เพิ่มเติมเพื่อกัน race condition
-6. งานสร้างผู้ใช้ระดับ admin ต้องเรียก Supabase Admin API จาก backend เท่านั้น และต้องเก็บ service role key ฝั่ง server
-7. Provisioning flow ควรเป็น atomic ขั้นต่ำ: create `auth.users` -> upsert `co_desk.profiles` -> write admin audit log (ถ้าล้มเหลวต้องมี error/audit state)
-
-## 7) ฟิลด์ที่จำเป็นสำหรับ Reporting Views
-
-| View | Required Fields |
-|---|---|
-| `vw_daily_booking_summary_by_department` | `bookings.booking_date_start`, `bookings.booking_date_end`, `bookings.status_code`, `departments.department_code`, `departments.department_name` |
-| `vw_department_capacity_utilization` | `bookings.booking_date_start`, `bookings.booking_date_end`, `bookings.status_code`, `departments.capacity_mode`, `departments.default_capacity_per_day`, `department_capacity_policies.*` |
-| `vw_employee_booking_frequency` | `bookings.start_at`, `bookings.status_code`, `profiles.employee_code`, `profiles.full_name`, `departments.department_code` |
-| `vw_holiday_bookings_detail` | `bookings.booking_date_start`, `bookings.booking_date_end`, `bookings.holiday_warning_acknowledged`, `holidays.holiday_date`, `holidays.holiday_name`, `profiles.full_name` |
-| `vw_booking_cancellations_summary` | `bookings.status_code`, `bookings.cancelled_at`, `bookings.booked_for_profile_id`, `departments.department_code` |
-| `vw_peak_usage_by_day_hour` | `bookings.start_at`, `bookings.end_at`, `bookings.status_code`, `departments.department_code` |
-
-## 8) แนวทางการวาดรูป ERD
-เพื่อให้วาด ERD ได้สอดคล้องกันไม่ว่าใช้คนหรือ AI ตัวอื่น ให้ใช้กติกานี้:
-1. ใช้ Crow's Foot notation
-2. วางตาราง master ซ้ายไปขวา: `roles`, `departments`, `profiles`, `department_capacity_policies`, `holidays`, `bookings`, `booking_audit_logs` (และ `user_admin_audit_logs` เป็น optional governance layer)
-3. แสดง PK/FK ชัดเจนทุกตาราง (tag `PK`, `FK`)
-4. แสดง optionality ที่คีย์ nullable เช่น `cancelled_by_profile_id`, `created_by_profile_id`
-5. แสดง relationship เชิงเงื่อนไข `bookings` <-> `holidays` เป็นเส้น dashed/annotation (logical relation, no direct FK)
-6. แยก reporting views ไว้ใน logical layer ใต้ ERD หลัก (ไม่ต้องวาดเป็น physical table)
-7. ใส่ note กลางรูปว่า "UI date format = YYYY-MM-DD, timezone = Asia/Bangkok"
-8. ระบุว่าไม่มี seat master รายตัว และ capacity คิดระดับ department
-
-## 9) Gap Analysis และข้อเสนอการแก้ไข
-| Gap ID | ประเด็นที่ยังไม่รองรับครบ | ผลกระทบ | แนวทางแก้ไข |
+## 6) Requirement Mapping: Business Rules ระดับแบบจำลองข้อมูล
+| Rule ID | Requirement ID | สาระของกติกา | การรองรับปัจจุบัน |
 |---|---|---|---|
-| `GAP-01` | การบังคับ HR/Admin scope ยังไม่ enforce ด้วย RLS จริง | เสี่ยง access เกินสิทธิ์ถ้าเรียก DB ตรง | เพิ่ม RLS policies + secure RPC ใน phase implementation |
-| `GAP-02` | Capacity check เชิง concurrency ยังไม่ปิดจบด้วย constraint อย่างเดียว | เสี่ยง over-capacity กรณีจองพร้อมกัน | Implement transactional RPC (lock + recheck + atomic write) |
-| `GAP-03` | Holiday confirm เป็น cross-table rule | CHECK constraint ทำไม่ได้ตรง | ใช้ RPC validate ก่อน insert/update และบันทึก audit |
-| `GAP-04` | User provisioning flow (`admin only`) ยังไม่ผูกกับ API/UI แบบสมบูรณ์ | ไม่ครบ flow เชิงปฏิบัติการ | ผูก Supabase Auth admin flow + backend authorization + profile sync |
-| `GAP-05` | ยังไม่มีตาราง audit เฉพาะงานจัดการผู้ใช้ใน SQL artifacts ปัจจุบัน | การตรวจสอบย้อนหลัง user governance ยังไม่ละเอียดพอ | เพิ่ม `co_desk.user_admin_audit_logs` ใน phase implementation และผูกกับ backend provisioning endpoint |
+| `BR-01` | `SB-04`, `SB-09` | ห้ามผู้ใช้เดิมจองซ้อนเวลา | DDL (`EXCLUDE`) + RPC placeholder |
+| `BR-02` | `DEP-03`, `DEP-03A`, `DEP-03B`, `CLR-05` | คุม capacity แบบ limited/unlimited | โครงสร้าง DDL + RPC placeholder |
+| `BR-03` | `HOL-03` | จองทับวันหยุดได้ แต่ต้องเตือนและยืนยัน | DDL field + RPC placeholder |
+| `BR-04` | `UR-01`, `ROLE-01..03`, `SEC-01` | RBAC + RLS ตามบทบาท | โครงสร้าง role/profile รองรับ; RLS ยังเป็น phase ถัดไป |
+| `BR-05` | `REP-01`, `REP-02` | รองรับรายงานสำหรับ hr/admin | มี reporting views แล้ว |
+| `BR-06` | `UR-05..UR-07`, `SEC-02`, `SEC-03` | Admin provisioning ผ่าน backend และ server-only secret | design intent ในเอกสารบทที่ 2-3 |
+| `BR-07` | `VAL-01..VAL-04` | validation email/role/department/status ก่อน sync profile | phase implementation |
+| `BR-08` | `AUD-01` | audit การจัดการผู้ใช้โดย admin | มี proposal table ยังไม่สร้างจริง |
+| `BR-09` | `FMT-01`, `SB-10` | `YYYY-MM-DD` + `Asia/Bangkok` | กำกับทั้ง schema/docs |
 
-## 10) สรุปความพร้อมสำหรับการวาด ERD
-สเปกนี้พร้อมนำไปวาด ERD ได้ทันที โดยมี entities, keys, relationships, business rules, constraints/index candidates, และ implementation notes ครบตาม requirement ของเฟสบทที่ 3 และรักษาความสอดคล้องกับ schema `co_desk` สำหรับการพัฒนาระยะถัดไป
+## 7) Candidate Constraints และ Indexes (ที่ควรอ้างในบทที่ 3)
+
+### 7.1 Constraints สำคัญใน SQL ปัจจุบัน
+1. `bookings_no_overlap_per_user_excl` (GiST exclusion)
+2. `department_capacity_policy_no_overlap_excl` (GiST exclusion)
+3. `bookings_mode_consistency_chk`, `bookings_hour_precision_chk`, `bookings_cancel_state_chk`
+4. `departments_capacity_mode_consistency_chk`
+5. `holidays_holiday_date_uk`, `roles_role_code_uk`, `departments_department_code_uk`, `profiles_employee_code_uk`
+
+### 7.2 Indexes สำคัญใน SQL ปัจจุบัน
+1. `uidx_profiles_email_lower`
+2. `idx_bookings_active_profile_start`, `idx_bookings_active_department_start`
+3. `idx_department_capacity_policies_effective_dates`
+4. `idx_holidays_active_date`
+5. `idx_booking_audit_logs_booking_id_action_at`
+
+### 7.3 Logic ที่ยังต้องพึ่ง RPC/transaction
+1. ตรวจ capacity แบบ concurrent-safe ใกล้เต็มความจุ
+2. flow holiday warning + explicit confirmation ก่อน write
+3. owner/admin scope check และ RLS policy enforcement
+4. transactional sync `auth.users` กับ `co_desk.profiles`
+
+## 8) หมายเหตุสำหรับ Supabase PostgreSQL
+1. ใช้ schema-qualified names (`co_desk.<object>`) อย่างสม่ำเสมอ
+2. `profiles.profile_id` ออกแบบให้ตรงกับ `auth.users.id` เพื่อรองรับ provisioning flow
+3. ฟิลด์ `timestamptz` ใช้เก็บเวลาเพื่อป้องกันปัญหา timezone drift; ส่วนรายงาน UI ใช้ `YYYY-MM-DD`
+4. RLS เป็น requirement บังคับเชิงสถาปัตยกรรม แต่ policy ยังไม่ประกาศใน SQL ชุดนี้
+5. ฟังก์ชันใน `04_create_rpc_placeholders.sql` compile/run ได้ แต่ยังเป็น placeholder สำหรับธุรกรรมจริง
+
+## 9) ฟิลด์ที่จำเป็นต่อ Reporting Views
+| View | ตารางต้นทางหลัก | ฟิลด์สำคัญที่ต้องมี |
+|---|---|---|
+| `vw_daily_booking_summary_by_department` | `bookings`, `departments` | `booking_date_start`, `booking_date_end`, `status_code`, `department_id`, `booked_for_profile_id` |
+| `vw_department_capacity_utilization` | `bookings`, `departments`, `department_capacity_policies` | `department_id`, `capacity_mode`, `default_capacity_per_day`, `effective_start_date`, `effective_end_date`, `capacity_per_day` |
+| `vw_employee_booking_frequency` | `bookings`, `profiles`, `departments` | `start_at`, `status_code`, `booked_for_profile_id`, `employee_code`, `full_name`, `department_code` |
+| `vw_holiday_bookings_detail` | `bookings`, `holidays`, `profiles`, `departments` | `booking_date_start`, `booking_date_end`, `holiday_warning_acknowledged`, `holiday_date`, `holiday_name`, `booked_for_profile_id` |
+| `vw_booking_cancellations_summary` | `bookings`, `departments` | `cancelled_at`, `status_code`, `department_id`, `booked_for_profile_id` |
+| `vw_peak_usage_by_day_hour` | `bookings`, `departments` | `start_at`, `end_at`, `status_code`, `department_id` |
+
+## 10) แนวทางการวาดรูป ERD (ให้วาดได้ตรงกัน)
+1. วาด entities ชุดหลัก 8 ตาราง: `roles`, `departments`, `profiles`, `department_capacity_policies`, `holidays`, `bookings`, `booking_audit_logs`, `user_department_history`
+2. วาด `auth.users` เป็น external entity (เส้นประ) หากต้องการสื่อ boundary ของ Supabase Auth
+3. ใส่ PK/FK ทุกจุดตามตารางในหัวข้อ 5.1 และกำกับ optionality (mandatory/optional) ให้ชัด
+4. ใส่ cardinality บนเส้นสัมพันธ์ทุกรายการ (1:N หรือ N:1 ตามมุมมองที่ใช้)
+5. ในกล่อง entity ให้แสดงเฉพาะ key attributes และ business-critical attributes เพื่อไม่ให้ภาพแน่นเกินไป
+6. เก็บคอลัมน์ metadata (`updated_at`, `request_id`, `ip_address`, `user_agent`) ไว้ในคำอธิบาย ไม่จำเป็นต้องใส่ในภาพ
+7. ไม่ต้องวาด views และ functions ในภาพ ERD แต่ให้กล่าวในบทที่ 3
+8. หากต้องการวาด proposed entity (`user_admin_audit_logs`) ให้แยกสีหรือป้าย “Future Phase”
+
+## 11) Notes ใต้ภาพ ERD (Assumptions / Limitations)
+1. ระบบคิด capacity ระดับฝ่าย (`department`) และไม่มี seat master รายตัว
+2. ความสัมพันธ์ booking กับ holiday เป็น logical relation ไม่ใช่ FK ตรง
+3. มาตรฐานวันเวลาในเอกสาร/UI คือ `YYYY-MM-DD` และ `Asia/Bangkok`; DB ใช้ `date` + `timestamptz`
+4. RLS, secure admin provisioning endpoint, และธุรกรรมแบบ atomic ยังเป็น scope ของ phase implementation
+5. ตาราง `co_desk.user_admin_audit_logs` เป็น design proposal เพื่อรองรับ `AUD-01` ยังไม่ใช่ physical table ใน SQL ปัจจุบัน
+
+## 12) Gap Analysis และข้อเสนอแก้ไข
+1. Gap: ยังไม่มี physical table สำหรับ audit การจัดการผู้ใช้โดย admin (`AUD-01`)  
+   ข้อเสนอ: เพิ่ม `co_desk.user_admin_audit_logs` ใน phase implementation พร้อม index ตาม `actor_profile_id`, `target_auth_user_id`, `action_at`
+2. Gap: `VAL-04` ระบุการ validate status แต่ model ปัจจุบันใช้ `profiles.is_active` (boolean)  
+   ข้อเสนอ: หากต้องการหลายสถานะ ให้เพิ่ม enum `profile_status` และแผน migration
+3. Gap: concurrency-safe capacity enforcement ยังไม่ครบในระดับ DDL  
+   ข้อเสนอ: ใช้ transactional RPC พร้อม locking strategy ใน phase implementation
+4. Gap: RLS policies ยังไม่ลง SQL migration  
+   ข้อเสนอ: เพิ่มเอกสาร policy matrix และ migration script ใน phase implementation
